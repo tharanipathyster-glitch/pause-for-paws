@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Play Store Graphics</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        canvas { border: 1px solid #ccc; margin: 10px 0; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Google Play Graphics Generator</h1>
+    
+    <h2>1. App Icon (512x512)</h2>
+    <canvas id="iconCanvas" width="512" height="512"></canvas>
+    <button onclick="downloadIcon()">Download Icon</button>
+    
+    <h2>2. Feature Graphic (1024x500)</h2>
+    <canvas id="featureCanvas" width="1024" height="500"></canvas>
+    <button onclick="downloadFeature()">Download Feature</button>
+    
+    <script>
+        // App Icon
+        const iconCtx = document.getElementById('iconCanvas').getContext('2d');
+        
+        // Green background
+        iconCtx.fillStyle = '#2E7D32';
+        iconCtx.fillRect(0, 0, 512, 512);
+        
+        // Draw paw print
+        const cx = 256, cy = 256;
+        
+        // Main pad
+        iconCtx.fillStyle = '#FFFFFF';
+        iconCtx.beginPath();
+        iconCtx.ellipse(cx, cy + 40, 60, 80, 0, 0, Math.PI * 2);
+        iconCtx.fill();
+        
+        // Toes
+        const toes = [
+            {x: cx - 100, y: cy - 100},
+            {x: cx - 40, y: cy - 130},
+            {x: cx + 40, y: cy - 130},
+            {x: cx + 100, y: cy - 100}
+        ];
+        
+        toes.forEach(toe => {
+            iconCtx.beginPath();
+            iconCtx.ellipse(toe.x, toe.y, 30, 30, 0, 0, Math.PI * 2);
+            iconCtx.fill();
+        });
+        
+        // Text
+        iconCtx.fillStyle = '#FFFFFF';
+        iconCtx.font = 'bold 48px Arial';
+        iconCtx.textAlign = 'center';
+        iconCtx.textBaseline = 'middle';
+        iconCtx.fillText('Pause for Paws', 256, 420);
+        
+        // Feature Graphic
+        const featureCtx = document.getElementById('featureCanvas').getContext('2d');
+        
+        // Gradient background
+        const gradient = featureCtx.createLinearGradient(0, 0, 0, 500);
+        gradient.addColorStop(0, '#1B5E20');
+        gradient.addColorStop(1, '#2E7D32');
+        featureCtx.fillStyle = gradient;
+        featureCtx.fillRect(0, 0, 1024, 500);
+        
+        // Add semi-transparent overlay with map icon
+        featureCtx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+        featureCtx.beginPath();
+        featureCtx.arc(850, 100, 80, 0, Math.PI * 2);
+        featureCtx.fill();
+        
+        // Title
+        featureCtx.fillStyle = '#FFFFFF';
+        featureCtx.font = 'bold 72px Arial';
+        featureCtx.textAlign = 'center';
+        featureCtx.textBaseline = 'middle';
+        featureCtx.fillText('Pause for Paws', 512, 120);
+        
+        // Subtitle
+        featureCtx.font = '48px Arial';
+        featureCtx.fillText('Wildlife Corridor Safety', 512, 240);
+        
+        // Disclaimer
+        featureCtx.font = '32px Arial';
+        featureCtx.fillStyle = '#C8E6C9';
+        featureCtx.fillText('Historical Data • Educational Tool', 512, 380);
+        
+        function downloadIcon() {
+            const canvas = document.getElementById('iconCanvas');
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = 'app-icon-512x512.png';
+            link.click();
+        }
+        
+        function downloadFeature() {
+            const canvas = document.getElementById('featureCanvas');
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = 'feature-graphic-1024x500.png';
+            link.click();
+        }
+    </script>
+</body>
+</html>

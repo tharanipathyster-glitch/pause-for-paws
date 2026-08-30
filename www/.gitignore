@@ -1,0 +1,19 @@
+# Node / package manager
+node_modules/
+package-lock.json
+
+# Android / build artefacts
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+
+# OS / editor
+.DS_Store
+.vscode/
+Thumbs.db
+
+# Secrets
+*.keystore
+*.jks
+google-maps-config.js

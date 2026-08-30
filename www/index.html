@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#13231e">
+  <title>Pause for Paws | Wildlife corridor intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="Pause for Paws home">
+        <span class="brand-mark" aria-hidden="true">+</span>
+          <span>pause <span>for paws</span></span>
+      </a>
+      <div class="topbar-status"><span class="status-dot"></span> Historical archive <span class="divider"></span> 23 Aug 2026</div>
+      <button class="icon-button" id="feedButton" title="Open feed importer" aria-label="Open feed importer">↗</button>
+    </header>
+
+    <main id="top">
+      <div class="legal-banner" style="margin: 1rem 0 0; padding: 1rem 1.25rem; border: 1px solid rgba(223,110,81,.45); background: rgba(243,240,232,.9); border-radius: 16px; color: #13231e; font-size: 0.96rem; line-height: 1.5;">
+        <strong>Historical pattern notice:</strong> This app is for informational, historical corridor analysis only and does not provide live animal tracking or guarantee current wildlife presence on the road. Driver alerts are advisory, not a real-time detection system. Use approved data only and review all legal permissions before public release.
+        <div style="margin-top: .5rem;"><a href="privacy-policy.html" style="color: #1d3d2f; text-decoration: underline; font-weight: 600;">Privacy policy</a></div>
+      </div>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Wildlife corridor intelligence / WY-191</p>
+          <h1>Slow down.<br><em>Something is moving.</em></h1>
+          <p class="hero-copy">A corridor-level signal for the moments when the road becomes habitat. Built for agency feeds, designed for drivers.</p>
+        </div>
+        <div class="hero-meta">
+          <span class="meta-label">Current operating mode</span>
+          <strong>Corridor state</strong>
+          <span>Not a live animal tracker</span>
+        </div>
+      </section>
+
+      <section class="dashboard-grid" aria-label="Crossing corridor dashboard">
+        <div class="map-panel panel">
+          <div class="panel-heading">
+            <div><span class="kicker">Historical field view</span><h2 id="mapTitle">North Yellowstone corridor</h2></div>
+            <span class="map-badge"><span class="status-dot"></span> Pattern detected</span>
+          </div>
+          <div class="map-canvas" id="mapCanvas" aria-label="Google map showing historical wildlife crossing corridors">
+            <div class="map-label label-top">YELLOWSTONE<br><small>NATIONAL PARK</small></div>
+            <div class="road road-one"></div><div class="road road-two"></div><div class="road road-three"></div>
+            <div class="water"></div>
+            <div class="corridor corridor-one" data-corridor="canyon"><span>01</span></div>
+            <div class="corridor corridor-two" data-corridor="elk"><span>02</span></div>
+            <div class="corridor corridor-three" data-corridor="madison"><span>03</span></div>
+            <div class="map-label label-bottom">US-191 N <span>•</span> MONTANA</div>
+            <div class="map-scale"><span></span> 5 mi</div>
+            <div class="map-controls"><button class="map-control" id="zoomIn" aria-label="Zoom in">+</button><button class="map-control" id="zoomOut" aria-label="Zoom out">−</button></div>
+          </div>
+          <div class="map-footer"><span><b class="legend-line active-line"></b> elevated risk</span><span><b class="legend-line quiet-line"></b> monitored</span><span class="mono">Updated 2 min ago</span></div>
+        </div>
+
+        <aside class="side-column">
+          <article class="alert-card panel" id="alertCard">
+            <div class="alert-head"><span class="signal-icon">!</span><span class="kicker">Driver message / preview</span><span class="live-chip">ARCHIVE</span></div>
+            <div class="alert-content"><h2 id="alertTitle">Historical risk pattern</h2><p id="alertMessage">This corridor has repeated wildlife activity in the selected archive. Use seasonal context; this is not a live animal alert.</p></div>
+            <div class="alert-route"><span>Next 4.2 mi</span><span class="route-line"></span><span id="alertSpecies">Elk movement</span></div>
+            <button class="primary-button" id="previewButton">Preview map message <span>→</span></button>
+          </article>
+          <article class="stats-panel panel">
+            <div class="stat"><span class="kicker">Corridors watched</span><strong>12</strong><span class="stat-note">across 3 districts</span></div>
+            <div class="stat"><span class="kicker">Signals this hour</span><strong id="signalsCount">27</strong><span class="stat-note">+8% vs. last Tuesday</span></div>
+            <div class="stat"><span class="kicker">Average confidence</span><strong id="confidenceValue">91<small>%</small></strong><span class="stat-note">sensor consensus</span></div>
+          </article>
+        </aside>
+      </section>
+
+      <section class="corridor-section">
+        <div class="section-heading"><div><span class="kicker">Signal register</span><h2>Active corridors</h2></div><button class="text-button" id="allCorridors">View all <span>↗</span></button></div>
+        <div class="corridor-list" id="corridorList"></div>
+      </section>
+
+      <section class="risk-section">
+        <div class="section-heading"><div><span class="kicker">National planning index / illustrative</span><h2>Top wildlife collision areas</h2></div><span class="mono">8 areas indexed</span></div>
+        <div class="risk-toolbar"><label class="search-box" for="riskSearch"><span>⌕</span><input id="riskSearch" type="search" placeholder="Search by state, road, or animal" aria-label="Search top wildlife collision areas"></label><button class="secondary-button" id="approachButton">Enable approach alerts</button><button class="secondary-button" id="simulateIowaButton">Simulate Iowa alert</button><button class="secondary-button" id="simulateDesMoinesButton">Simulate Des Moines alert</button></div>
+        <div class="risk-list" id="riskList"></div>
+        <p class="data-note">Planning seed only: replace these illustrative areas with verified state DOT or wildlife-agency collision data before public use.</p>
+      </section>
+
+      <section class="feed-section panel" id="feedSection">
+        <div class="feed-copy"><span class="kicker">Historical archive bridge</span><h2>Find the road’s recurring patterns.</h2><p>Paste an approved Waze archive export or partner JSON. Pause for Paws groups coordinate events into evidence for corridor planning, seasonal signage, and future map publication.</p><div class="feed-notes"><span>CSV + JSON accepted</span><span>Stable corridor IDs</span><span>No live tracking</span></div></div>
+        <form class="feed-form" id="feedForm"><label for="feedInput">Historical coordinate archive <span>CSV or JSON</span></label><div class="archive-actions"><button class="secondary-button" type="button" id="loadIowaButton">Load ICAT 2025 Iowa data</button><button class="secondary-button" type="button" id="loadMetroButton">Show Des Moines area</button><span id="archiveSource">Synthetic sample</span></div><textarea id="feedInput" spellcheck="false">id,lat,lng,species,confidence,reportedAt
+      wz-191-elk-01,45.104,-110.741,Elk,0.94,2026-05-23T18:42:00Z
+      wz-191-elk-02,45.116,-110.728,Elk,0.89,2026-06-11T18:51:00Z
+      wz-191-deer-03,45.109,-110.735,Mule deer,0.86,2026-07-18T19:04:00Z</textarea><div class="form-actions"><span class="form-status" id="formStatus">Awaiting archive</span><button class="primary-button" type="submit">Analyze archive <span>→</span></button></div></form>
+      </section>
+    </main>
+    <footer><span>Pause for Paws / field prototype</span><span>Data is illustrative. Partner approval and legal review required before deployment.</span></footer>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <div class="approach-popup" id="approachPopup" role="alert" aria-live="assertive"><button id="closePopup" aria-label="Close alert">×</button><span class="popup-mark">+</span><span class="kicker">Approaching wildlife area</span><strong>Pause for Paws</strong><p id="popupMessage">Wildlife collision risk area ahead. Slow down and watch both shoulders.</p></div>
+  <script src="google-maps-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

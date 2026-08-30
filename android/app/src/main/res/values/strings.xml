@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Pause for Paws</string>
+    <string name="title_activity_main">Pause for Paws</string>
+    <string name="package_name">com.pauseforpaws.app</string>
+    <string name="custom_url_scheme">com.pauseforpaws.app</string>
+</resources>

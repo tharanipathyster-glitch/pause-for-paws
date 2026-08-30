@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pause for Paws - Screenshot Generator</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f5f5f5;
+        }
+        h1 { color: #2E7D32; }
+        .screenshot {
+            width: 1080px;
+            height: 1920px;
+            margin: 20px 0;
+            border: 2px solid #ccc;
+            background: white;
+            position: relative;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .phone-frame {
+            width: 540px;
+            height: 960px;
+            margin: 20px auto;
+            border: 8px solid #333;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        }
+        canvas { 
+            width: 100%; 
+            height: 100%;
+            display: block;
+        }
+        button { 
+            padding: 10px 20px; 
+            margin: 10px 5px; 
+            cursor: pointer;
+            background: #2E7D32;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button:hover { background: #1B5E20; }
+        .info { 
+            margin: 10px 0; 
+            padding: 10px; 
+            background: #E8F5E9; 
+            border-left: 4px solid #2E7D32;
+        }
+    </style>
+</head>
+<body>
+    <h1>Pause for Paws - Google Play Screenshots</h1>
+    <p>Screenshots for Google Play Store (1080x1920 px)</p>
+    
+    <h2>Screenshot 1: Home Screen with Disclaimer</h2>
+    <div class="info">Shows main app interface with legal disclaimer prominently displayed</div>
+    <div class="phone-frame">
+        <canvas id="screenshot1"></canvas>
+    </div>
+    <button onclick="downloadScreenshot('screenshot1', 'home-screen.png')">Download Screenshot 1</button>
+
+    <h2>Screenshot 2: Active Corridors</h2>
+    <div class="info">Shows the list of active wildlife corridors with risk levels</div>
+    <div class="phone-frame">
+        <canvas id="screenshot2"></canvas>
+    </div>
+    <button onclick="downloadScreenshot('screenshot2', 'corridors-list.png')">Download Screenshot 2</button>
+
+    <h2>Screenshot 3: Map View</h2>
+    <div class="info">Shows corridor locations on map</div>
+    <div class="phone-frame">
+        <canvas id="screenshot3"></canvas>
+    </div>
+    <button onclick="downloadScreenshot('screenshot3', 'map-view.png')">Download Screenshot 3</button>
+
+    <script>
+        function drawScreenshot1() {
+            const canvas = document.getElementById('screenshot1');
+            const ctx = canvas.getContext('2d');
+            ctx.width = 1080;
+            ctx.height = 1920;
+            
+            // Status bar
+            ctx.fillStyle = '#2E7D32';
+            ctx.fillRect(0, 0, 1080, 80);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 28px Arial';
+            ctx.fillText('Pause for Paws', 30, 60);
+            
+            // Disclaimer banner
+            ctx.fillStyle = '#FFF3CD';
+            ctx.fillRect(0, 80, 1080, 200);
+            ctx.fillStyle = '#856404';
+            ctx.font = 'bold 24px Arial';
+            ctx.fillText('⚠️ DISCLAIMER', 30, 130);
+            ctx.font = '18px Arial';
+            ctx.fillText('This app uses HISTORICAL DATA ONLY', 30, 170);
+            ctx.fillText('No real-time animal tracking', 30, 200);
+            ctx.fillText('For informational purposes only', 30, 230);
+            
+            // Main content
+            ctx.fillStyle = '#2E7D32';
+            ctx.font = 'bold 32px Arial';
+            ctx.fillStyle = '#2E7D32';
+            ctx.fillText('Wildlife Corridors', 30, 350);
+            
+            // Corridor cards
+            const corridors = [
+                { name: 'Highway 30 - Cedar County', risk: 'HIGH', color: '#D32F2F' },
+                { name: 'I-35 North Section', risk: 'MEDIUM', color: '#F57C00' },
+                { name: 'County Road 12', risk: 'LOW', color: '#388E3C' }
+            ];
+            
+            let y = 420;
+            corridors.forEach((corridor, idx) => {
+                // Card background
+                ctx.fillStyle = '#F5F5F5';
+                ctx.fillRect(20, y, 1040, 150);
+                ctx.strokeStyle = '#CCCCCC';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(20, y, 1040, 150);
+                
+                // Corridor name
+                ctx.fillStyle = '#333333';
+                ctx.font = 'bold 22px Arial';
+                ctx.fillText(corridor.name, 40, y + 50);
+                
+                // Risk level
+                ctx.fillStyle = corridor.color;
+                ctx.fillRect(40, y + 70, 200, 50);
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 20px Arial';
+                ctx.fillText(corridor.risk + ' RISK', 60, y + 110);
+                
+                y += 180;
+            });
+            
+            // Footer
+            ctx.fillStyle = '#E8F5E9';
+            ctx.fillRect(0, 1800, 1080, 120);
+            ctx.fillStyle = '#2E7D32';
+            ctx.font = '16px Arial';
+            ctx.fillText('Data Source: Historical Archive Analysis', 30, 1850);
+            ctx.fillText('For educational purposes only', 30, 1900);
+        }
+
+        function drawScreenshot2() {
+            const canvas = document.getElementById('screenshot2');
+            const ctx = canvas.getContext('2d');
+            ctx.width = 1080;
+            ctx.height = 1920;
+            
+            // Status bar
+            ctx.fillStyle = '#2E7D32';
+            ctx.fillRect(0, 0, 1080, 80);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 28px Arial';
+            ctx.fillText('Risk Analysis', 30, 60);
+            
+            // Header
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 80, 1080, 120);
+            ctx.fillStyle = '#2E7D32';
+            ctx.font = 'bold 26px Arial';
+            ctx.fillText('Active Corridors Detected', 30, 170);
+            
+            // Risk indicators
+            const risks = [
+                { zone: 'Zone A: Highway 30', incidents: 47, level: 'CRITICAL', color: '#C62828' },
+                { zone: 'Zone B: I-35 North', incidents: 23, level: 'HIGH', color: '#D32F2F' },
+                { zone: 'Zone C: County Road 12', incidents: 8, level: 'MEDIUM', color: '#F57C00' },
+                { zone: 'Zone D: Rural Route 5', incidents: 3, level: 'LOW', color: '#388E3C' }
+            ];
+            
+            let y = 250;
+            risks.forEach(risk => {
+                // Risk card
+                ctx.fillStyle = risk.color;
+                ctx.fillRect(20, y, 40, 100);
+                
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 20px Arial';
+                ctx.fillText(risk.zone, 80, y + 35);
+                
+                ctx.font = '16px Arial';
+                ctx.fillText('Historical Incidents: ' + risk.incidents, 80, y + 70);
+                ctx.fillText('Risk Level: ' + risk.level, 80, y + 100);
+                
+                y += 130;
+            });
+            
+            // Statistics section
+            ctx.fillStyle = '#E8F5E9';
+            ctx.fillRect(0, 1500, 1080, 420);
+            
+            ctx.fillStyle = '#2E7D32';
+            ctx.font = 'bold 24px Arial';
+            ctx.fillText('Historical Statistics', 30, 1560);
+            
+            ctx.font = '18px Arial';
+            ctx.fillText('Total Incidents Analyzed: 81', 30, 1620);
+            ctx.fillText('Time Period: 2015-2024', 30, 1670);
+            ctx.fillText('Data Source: ICAT Archives', 30, 1720);
+            ctx.fillText('Last Updated: August 2026', 30, 1770);
+            
+            ctx.fillStyle = '#666666';
+            ctx.font = '14px Arial';
+            ctx.fillText('⚠️ This analysis uses historical patterns only', 30, 1850);
+            ctx.fillText('Does NOT predict real-time events', 30, 1895);
+        }
+
+        function drawScreenshot3() {
+            const canvas = document.getElementById('screenshot3');
+            const ctx = canvas.getContext('2d');
+            ctx.width = 1080;
+            ctx.height = 1920;
+            
+            // Status bar
+            ctx.fillStyle = '#2E7D32';
+            ctx.fillRect(0, 0, 1080, 80);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 28px Arial';
+            ctx.fillText('Corridor Map', 30, 60);
+            
+            // Map background
+            ctx.fillStyle = '#E0F2F1';
+            ctx.fillRect(0, 80, 1080, 1200);
+            
+            // Draw simplified map grid
+            ctx.strokeStyle = '#B2DFDB';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 10; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * 108, 80);
+                ctx.lineTo(i * 108, 1280);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(0, 80 + i * 112);
+                ctx.lineTo(1080, 80 + i * 112);
+                ctx.stroke();
+            }
+            
+            // Draw corridor markers
+            const markers = [
+                { x: 200, y: 300, zone: 'Highway 30', color: '#D32F2F' },
+                { x: 800, y: 600, zone: 'I-35 North', color: '#F57C00' },
+                { x: 400, y: 900, zone: 'County Rd 12', color: '#388E3C' },
+                { x: 700, y: 400, zone: 'Rural Route 5', color: '#F57C00' }
+            ];
+            
+            markers.forEach(marker => {
+                // Draw circle
+                ctx.fillStyle = marker.color;
+                ctx.beginPath();
+                ctx.arc(marker.x, marker.y, 40, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw label
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(marker.zone, marker.x, marker.y + 5);
+            });
+            
+            // Legend
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 1300, 1080, 620);
+            
+            ctx.fillStyle = '#2E7D32';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('Risk Level Legend', 30, 1360);
+            
+            // Legend items
+            const legend = [
+                { color: '#D32F2F', label: 'Critical Risk' },
+                { color: '#F57C00', label: 'High/Medium Risk' },
+                { color: '#388E3C', label: 'Low Risk' }
+            ];
+            
+            let legendY = 1430;
+            legend.forEach(item => {
+                ctx.fillStyle = item.color;
+                ctx.fillRect(30, legendY, 30, 30);
+                
+                ctx.fillStyle = '#333333';
+                ctx.font = '18px Arial';
+                ctx.fillText(item.label, 80, legendY + 25);
+                
+                legendY += 60;
+            });
+            
+            // Footer disclaimer
+            ctx.fillStyle = '#FFF3CD';
+            ctx.fillRect(0, 1750, 1080, 170);
+            ctx.fillStyle = '#856404';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText('Historical Data Only - No Real-Time Tracking', 30, 1800);
+            ctx.font = '14px Arial';
+            ctx.fillText('Use for educational and awareness purposes', 30, 1850);
+            ctx.fillText('Last Updated: August 2026', 30, 1890);
+        }
+
+        // Draw all screenshots
+        drawScreenshot1();
+        drawScreenshot2();
+        drawScreenshot3();
+
+        function downloadScreenshot(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            canvas.width = 1080;
+            canvas.height = 1920;
+            
+            // Redraw based on which screenshot
+            if (canvasId === 'screenshot1') drawScreenshot1();
+            else if (canvasId === 'screenshot2') drawScreenshot2();
+            else if (canvasId === 'screenshot3') drawScreenshot3();
+            
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = filename;
+            link.click();
+        }
+    </script>
+</body>
+</html>
