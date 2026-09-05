@@ -24,11 +24,6 @@ let riskCircles = [];
 
 function loadGoogleMap() {
   const mapCanvas = document.querySelector("#mapCanvas");
-  const isCapacitorAndroid = window.location.protocol === "https:" && window.location.hostname === "localhost" && /Android/i.test(navigator.userAgent);
-  if (isCapacitorAndroid) {
-    showToast("Showing the built-in historical corridor map");
-    return;
-  }
   if (!window.GOOGLE_MAPS_API_KEY) {
     showToast("Showing the built-in historical map view");
     return;
@@ -48,6 +43,7 @@ function loadGoogleMap() {
     document.querySelector("#mapCanvas").classList.add("google-map-ready");
     renderGoogleEvents(latestEvents);
     renderRiskAreas(riskAreas);
+    showCurrentLocation(true);
   };
   const script = document.createElement("script");
   script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(window.GOOGLE_MAPS_API_KEY)}&callback=initGoogleMap&loading=async&v=weekly`;
@@ -255,6 +251,21 @@ document.querySelector("#approachButton").addEventListener("click", () => {
 document.querySelector("#closePopup").addEventListener("click", () => document.querySelector("#approachPopup").classList.remove("visible"));
 function distanceMiles(latOne, lngOne, latTwo, lngTwo) { const radians = Math.PI / 180; const latitude = (latTwo - latOne) * radians; const longitude = (lngTwo - lngOne) * radians; const value = Math.sin(latitude / 2) ** 2 + Math.cos(latOne * radians) * Math.cos(latTwo * radians) * Math.sin(longitude / 2) ** 2; return 3958.8 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value)); }
 let zoom = 1;
+let currentLocationMarker;
+function showCurrentLocation(isInitialLoad = false) {
+  if (!navigator.geolocation) { showToast("Location is not available on this device"); return; }
+  navigator.geolocation.getCurrentPosition((position) => {
+    const coordinates = { lat: position.coords.latitude, lng: position.coords.longitude };
+    if (googleMap && window.google) {
+      googleMap.panTo(coordinates);
+      googleMap.setZoom(13);
+      if (currentLocationMarker) currentLocationMarker.setMap(null);
+      currentLocationMarker = new google.maps.Marker({ position: coordinates, map: googleMap, title: "Your current location", label: "You" });
+    }
+    if (!isInitialLoad) showToast("Map centered on your current location");
+  }, () => { if (!isInitialLoad) showToast("Location permission is needed to center the map"); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+}
+document.querySelector("#locateMe").addEventListener("click", showCurrentLocation);
 document.querySelector("#zoomIn").addEventListener("click", () => { zoom = Math.min(1.25, zoom + .05); document.querySelector("#mapCanvas").style.transform = `scale(${zoom})`; });
 document.querySelector("#zoomOut").addEventListener("click", () => { zoom = Math.max(1, zoom - .05); document.querySelector("#mapCanvas").style.transform = `scale(${zoom})`; });
 
