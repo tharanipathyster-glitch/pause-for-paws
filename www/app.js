@@ -23,14 +23,17 @@ let riskMarkers = [];
 let riskCircles = [];
 
 function loadGoogleMap() {
-  if (!window.GOOGLE_MAPS_API_KEY) return;
+  const mapCanvas = document.querySelector("#mapCanvas");
+  if (!window.GOOGLE_MAPS_API_KEY) {
+    showToast("Showing the built-in historical map view");
+    return;
+  }
   window.gm_authFailure = () => {
-    const mapCanvas = document.querySelector("#mapCanvas");
     mapCanvas.classList.remove("google-map-ready");
     mapCanvas.querySelectorAll(":scope > div").forEach((child) => {
       if (child.querySelector(".gm-style") || child.textContent.includes("Oops! Something went wrong")) child.remove();
     });
-    showToast("Google Maps key rejected; demo map remains available");
+    showToast("Google Maps access was rejected; historical map view remains available");
   };
   window.initGoogleMap = () => {
     googleMap = new google.maps.Map(document.querySelector("#mapCanvas"), {
@@ -42,10 +45,10 @@ function loadGoogleMap() {
     renderRiskAreas(riskAreas);
   };
   const script = document.createElement("script");
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(window.GOOGLE_MAPS_API_KEY)}&callback=initGoogleMap&v=weekly`;
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(window.GOOGLE_MAPS_API_KEY)}&callback=initGoogleMap&loading=async&v=weekly`;
   script.async = true;
   script.defer = true;
-  script.onerror = () => showToast("Google Maps could not load; fallback view remains active");
+  script.onerror = () => showToast("Google Maps could not load; historical map view remains active");
   document.head.appendChild(script);
 }
 
