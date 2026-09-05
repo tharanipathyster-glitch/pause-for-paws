@@ -4,6 +4,7 @@ import csv
 import json
 import math
 import os
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).parent
 PORT = int(os.environ.get("PORT", "5500"))
@@ -107,7 +108,8 @@ def send_json(handler, payload, status=200):
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == "/api/icat-2025":
+        request_path = urlsplit(self.path).path
+        if request_path == "/api/icat-2025":
             try:
                 events = parse_icat_csv()
                 result = analyze(events)
@@ -117,7 +119,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as error:
                 send_json(self, {"error": str(error)}, 500)
             return
-        if self.path == "/api/icat-2025-des-moines":
+        if request_path == "/api/icat-2025-des-moines":
             try:
                 events = des_moines_area(parse_icat_csv())
                 result = analyze(events)
@@ -127,16 +129,16 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as error:
                 send_json(self, {"error": str(error)}, 500)
             return
-        if self.path == "/api/archive":
+        if request_path == "/api/archive":
             try:
                 text = (ROOT / "waze-archive-test-data.csv").read_text(encoding="utf-8")
                 send_json(self, analyze(parse_events(text)))
             except Exception as error:
                 send_json(self, {"error": str(error)}, 500)
             return
-        path = ROOT / ("index.html" if self.path in ("/", "") else self.path.lstrip("/"))
+        path = ROOT / ("index.html" if request_path in ("/", "") else request_path.lstrip("/"))
         if path.exists() and path.is_file() and ROOT in path.parents:
-            content_type = {".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".csv": "text/csv"}.get(path.suffix, "application/octet-stream")
+            content_type = {".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".csv": "text/csv", ".json": "application/json"}.get(path.suffix, "application/octet-stream")
             body = path.read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", content_type)

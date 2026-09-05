@@ -1,0 +1,35 @@
+{
+  "updatedAt": "2026-09-05T18:00:00Z",
+  "expiresAt": "2026-10-05T18:00:00Z",
+  "source": "Pause for Paws prototype sample feed - replace with an approved Iowa DOT or wildlife-agency export",
+  "dataType": "historical",
+  "events": [
+    {
+      "id": "prototype-001",
+      "lat": 41.5807,
+      "lng": -93.862,
+      "species": "Animal-related crash",
+      "confidence": 0.8,
+      "reportedAt": "2025-05-23T18:42:00Z",
+      "road": "Iowa roads"
+    },
+    {
+      "id": "prototype-002",
+      "lat": 41.592,
+      "lng": -93.85,
+      "species": "Animal-related crash",
+      "confidence": 0.8,
+      "reportedAt": "2025-06-11T18:51:00Z",
+      "road": "Iowa roads"
+    },
+    {
+      "id": "prototype-003",
+      "lat": 41.571,
+      "lng": -93.875,
+      "species": "Animal-related crash",
+      "confidence": 0.8,
+      "reportedAt": "2025-07-18T19:04:00Z",
+      "road": "Iowa roads"
+    }
+  ]
+}

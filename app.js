@@ -1,8 +1,9 @@
 const demoCorridors = [
-  { id: "01", name: "Gardiner gateway", species: "Elk + mule deer", detail: "US-191 / mile 14–19", risk: "Elevated", confidence: 94, detections: 12 },
-  { id: "02", name: "Blacktail plateau", species: "Elk", detail: "US-191 / mile 31–36", risk: "Elevated", confidence: 88, detections: 8 },
-  { id: "03", name: "Madison bend", species: "Moose", detail: "US-287 / mile 08–12", risk: "Monitored", confidence: 76, detections: 4 }
+  { id: "01", name: "Polk County approach", species: "Animal-related crashes", detail: "Iowa roads / Des Moines area", risk: "Elevated", confidence: 94, detections: 12 },
+  { id: "02", name: "Dallas County corridor", species: "Animal-related crashes", detail: "Iowa roads / Dallas County", risk: "Elevated", confidence: 88, detections: 8 },
+  { id: "03", name: "Warren County passage", species: "Animal-related crashes", detail: "Iowa roads / Warren County", risk: "Monitored", confidence: 76, detections: 4 }
 ];
+const REMOTE_FEED_URL = "data/corridors.json";
 const corridorList = document.querySelector("#corridorList");
 const toast = document.querySelector("#toast");
 const riskAreas = [
@@ -22,6 +23,7 @@ let latestEvents = [];
 let riskMarkers = [];
 let riskCircles = [];
 let currentLocationCoordinates;
+let remoteFeedState = { updatedAt: null, expiresAt: null, source: "Bundled fallback" };
 
 function loadGoogleMap() {
   const mapCanvas = document.querySelector("#mapCanvas");
@@ -135,8 +137,45 @@ function applyBackendAnalysis(analysis, payload, sourceLabel) {
   document.querySelector("#signalsCount").textContent = String(27 + payload.length);
   document.querySelector("#alertSpecies").textContent = `${species} movement`;
   document.querySelector("#archiveSource").textContent = sourceLabel;
+  document.querySelector("#feedUpdated").textContent = remoteFeedState.updatedAt ? `Updated ${formatFeedDate(remoteFeedState.updatedAt)}` : sourceLabel;
   renderGoogleEvents(payload);
   if (analysis?.clusters) renderCorridors(analysis.clusters.slice().sort((first, second) => second.events - first.events).slice(0, 60).map((cluster) => ({ id: cluster.id, name: `Historical cluster ${cluster.id}`, species: cluster.species, detail: `${cluster.events} events / ${cluster.center.lat.toFixed(3)}, ${cluster.center.lng.toFixed(3)}`, risk: cluster.risk, confidence: cluster.confidence })));
+}
+
+function formatFeedDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "date unavailable" : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+async function loadRemoteHistoricalFeed() {
+  const status = document.querySelector("#formStatus");
+  try {
+    const response = await fetch(`${REMOTE_FEED_URL}?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`Remote feed returned ${response.status}`);
+    const feed = await response.json();
+    if (!feed.updatedAt || !Array.isArray(feed.events) || !feed.events.length) throw new Error("Remote feed has no historical events");
+    if (feed.expiresAt && new Date(feed.expiresAt) <= new Date()) throw new Error("Remote feed has expired");
+    const payload = validateFeed(feed.events);
+    remoteFeedState = { updatedAt: feed.updatedAt, expiresAt: feed.expiresAt, source: feed.source || "Remote historical feed" };
+    document.querySelector("#feedInput").value = payload.slice(0, 20).map((item) => `${item.id || "event"},${item.lat},${item.lng},${item.species || "Wildlife"},${item.confidence || .5},${item.reportedAt || ""}`).join("\n");
+    applyBackendAnalysis(null, payload, remoteFeedState.source);
+    status.textContent = `${payload.length} historical events loaded`;
+    status.className = "form-status success";
+    showToast(`Historical data refreshed: ${formatFeedDate(feed.updatedAt)}`);
+  } catch (error) {
+    remoteFeedState = { updatedAt: null, expiresAt: null, source: "Bundled fallback" };
+    try {
+      const fallbackResponse = await fetch("/waze-archive-test-data.csv");
+      const fallbackPayload = validateFeed(parseArchive(await fallbackResponse.text()));
+      applyBackendAnalysis(null, fallbackPayload, "Bundled fallback archive");
+      status.textContent = `Using bundled fallback: ${fallbackPayload.length} events`;
+      status.className = "form-status error";
+      document.querySelector("#feedUpdated").textContent = "Offline fallback";
+    } catch (fallbackError) {
+      status.textContent = `No historical feed available: ${fallbackError.message}`;
+      status.className = "form-status error";
+    }
+  }
 }
 
 function renderCorridors(corridors = demoCorridors) {
@@ -259,6 +298,7 @@ document.querySelector("#approachButton").addEventListener("click", () => {
   showToast("Approach alerts enabled for this browser");
 });
 document.querySelector("#closePopup").addEventListener("click", () => document.querySelector("#approachPopup").classList.remove("visible"));
+document.querySelector("#refreshFeedButton").addEventListener("click", loadRemoteHistoricalFeed);
 function distanceMiles(latOne, lngOne, latTwo, lngTwo) { const radians = Math.PI / 180; const latitude = (latTwo - latOne) * radians; const longitude = (lngTwo - lngOne) * radians; const value = Math.sin(latitude / 2) ** 2 + Math.cos(latOne * radians) * Math.cos(latTwo * radians) * Math.sin(longitude / 2) ** 2; return 3958.8 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value)); }
 let zoom = 1;
 let currentLocationMarker;
@@ -282,11 +322,4 @@ document.querySelectorAll(".corridor").forEach((marker) => marker.addEventListen
 renderCorridors();
 loadGoogleMap();
 renderRiskList(riskAreas);
-fetch("/waze-archive-test-data.csv")
-  .then((response) => response.text())
-  .then((text) => {
-    latestEvents = validateFeed(parseArchive(text));
-    document.querySelector("#formStatus").textContent = `${latestEvents.length} test events ready`;
-    renderGoogleEvents(latestEvents);
-  })
-  .catch(() => undefined);
+loadRemoteHistoricalFeed();

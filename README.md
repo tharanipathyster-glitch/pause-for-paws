@@ -34,6 +34,10 @@ Do not publish the API key in a public repository. A browser key is visible by d
 
 To enable the real Google basemap, put a browser-restricted Maps JavaScript API key in [google-maps-config.js](google-maps-config.js). The key must have Maps JavaScript API enabled, billing enabled, and an HTTP referrer restriction for the production domain. Do not commit a real key to source control.
 
+## Historical data feed
+
+The app reads approved historical events from [data/corridors.json](data/corridors.json) and falls back to the bundled archive when the remote feed is unavailable or expired. Replace the prototype feed with a reviewed Iowa DOT or wildlife-agency export before public use. Keep `updatedAt`, `expiresAt`, `source`, and `events` in the feed so the app can show freshness and reject stale data without requiring a new Play Store release.
+
 ## What is implemented
 
 - A map-style field view with three monitored corridors.
