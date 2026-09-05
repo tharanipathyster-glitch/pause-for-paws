@@ -21,6 +21,7 @@ let googleCircles = [];
 let latestEvents = [];
 let riskMarkers = [];
 let riskCircles = [];
+let currentLocationCoordinates;
 
 function loadGoogleMap() {
   const mapCanvas = document.querySelector("#mapCanvas");
@@ -72,6 +73,15 @@ function renderGoogleEvents(events) {
     googleCircles.push(new google.maps.Circle({ map: googleMap, center, radius: 3500, fillColor: "#df6e51", fillOpacity: .16, strokeColor: "#df6e51", strokeOpacity: .7, strokeWeight: 2 }));
   }
   googleMap.fitBounds(bounds, 60);
+  if (currentLocationCoordinates) centerMapOnCurrentLocation();
+}
+
+function centerMapOnCurrentLocation() {
+  if (!googleMap || !currentLocationCoordinates) return;
+  googleMap.panTo(currentLocationCoordinates);
+  googleMap.setZoom(13);
+  if (currentLocationMarker) currentLocationMarker.setMap(null);
+  currentLocationMarker = new google.maps.Marker({ position: currentLocationCoordinates, map: googleMap, title: "Your current location", label: "You" });
 }
 
 function updateDriverMessage(activity, locationLabel) {
@@ -255,13 +265,8 @@ let currentLocationMarker;
 function showCurrentLocation(isInitialLoad = false) {
   if (!navigator.geolocation) { showToast("Location is not available on this device"); return; }
   navigator.geolocation.getCurrentPosition((position) => {
-    const coordinates = { lat: position.coords.latitude, lng: position.coords.longitude };
-    if (googleMap && window.google) {
-      googleMap.panTo(coordinates);
-      googleMap.setZoom(13);
-      if (currentLocationMarker) currentLocationMarker.setMap(null);
-      currentLocationMarker = new google.maps.Marker({ position: coordinates, map: googleMap, title: "Your current location", label: "You" });
-    }
+    currentLocationCoordinates = { lat: position.coords.latitude, lng: position.coords.longitude };
+    centerMapOnCurrentLocation();
     if (!isInitialLoad) showToast("Map centered on your current location");
   }, () => { if (!isInitialLoad) showToast("Location permission is needed to center the map"); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
 }
