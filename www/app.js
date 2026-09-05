@@ -245,6 +245,21 @@ document.querySelector("#previewButton").addEventListener("click", () => {
   document.querySelector("#alertCard").animate([{ transform: "translateY(0)" }, { transform: "translateY(-4px)" }, { transform: "translateY(0)" }], { duration: 350 });
 });
 
+let backgroundAlertsActive = false;
+document.querySelector("#backgroundAlertButton").addEventListener("click", async () => {
+  if (!window.Capacitor?.isNativePlatform?.()) { showToast("Background alerts are available in the Android app"); return; }
+  const button = document.querySelector("#backgroundAlertButton");
+  try {
+    const corridorAlert = window.Capacitor.Plugins.CorridorAlert;
+    const result = backgroundAlertsActive ? await corridorAlert.stop() : await corridorAlert.start();
+    backgroundAlertsActive = result.running;
+    button.textContent = backgroundAlertsActive ? "Disable background alerts" : "Enable background alerts (Android app)";
+    showToast(backgroundAlertsActive ? "Background corridor alerts enabled" : "Background corridor alerts disabled");
+  } catch (error) {
+    showToast(error.message || "Could not toggle background alerts");
+  }
+});
+
 document.querySelector("#feedButton").addEventListener("click", () => document.querySelector("#feedSection").scrollIntoView({ behavior: "smooth" }));
 document.querySelector("#loadIowaButton").addEventListener("click", async () => {
   const status = document.querySelector("#formStatus");
