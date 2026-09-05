@@ -24,6 +24,11 @@ let riskCircles = [];
 
 function loadGoogleMap() {
   const mapCanvas = document.querySelector("#mapCanvas");
+  const isCapacitorAndroid = window.location.protocol === "https:" && window.location.hostname === "localhost" && /Android/i.test(navigator.userAgent);
+  if (isCapacitorAndroid) {
+    showToast("Showing the built-in historical corridor map");
+    return;
+  }
   if (!window.GOOGLE_MAPS_API_KEY) {
     showToast("Showing the built-in historical map view");
     return;

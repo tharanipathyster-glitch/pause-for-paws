@@ -3,6 +3,14 @@ apply plugin: 'com.android.application'
 android {
     namespace "com.pauseforpaws.app"
     compileSdk rootProject.ext.compileSdkVersion
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("PAUSE_FOR_PAWS_KEYSTORE") ?: "C:/Users/Owner/AndroidKeys/pause-for-paws-release.jks")
+            storePassword System.getenv("PAUSE_FOR_PAWS_KEYSTORE_PASSWORD")
+            keyAlias System.getenv("PAUSE_FOR_PAWS_KEY_ALIAS") ?: "pause-for-paws"
+            keyPassword System.getenv("PAUSE_FOR_PAWS_KEY_PASSWORD")
+        }
+    }
     defaultConfig {
         applicationId "com.pauseforpaws.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -18,6 +26,7 @@ android {
     }
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
