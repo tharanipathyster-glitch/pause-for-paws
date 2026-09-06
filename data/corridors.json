@@ -1,7 +1,7 @@
 {
-  "updatedAt": "2026-09-05T18:00:00Z",
-  "expiresAt": "2026-10-05T18:00:00Z",
-  "source": "Pause for Paws prototype sample feed - replace with an approved Iowa DOT or wildlife-agency export",
+  "updatedAt": "2026-09-06T12:00:00Z",
+  "expiresAt": "2026-12-05T12:00:00Z",
+  "source": "Pause for Paws historical prototype feed; includes a user-reported Waukee coyote crossing that requires periodic review",
   "dataType": "historical",
   "events": [
     {
@@ -30,6 +30,16 @@
       "confidence": 0.8,
       "reportedAt": "2025-07-18T19:04:00Z",
       "road": "Iowa roads"
+    },
+    {
+      "id": "waukee-esker-florence-coyote-001",
+      "lat": 41.5811505,
+      "lng": -93.8617349,
+      "species": "Coyote",
+      "confidence": 0.5,
+      "reportedAt": "2026-09-06T12:00:00Z",
+      "road": "SE Florence Dr & SE Esker Ridge Dr, Waukee, IA",
+      "source": "User-reported historical crossing; review before extending expiry"
     }
   ]
 }
