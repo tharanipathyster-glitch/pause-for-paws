@@ -18,7 +18,6 @@
           <span>pause <span>for paws</span></span>
       </a>
       <div class="topbar-status"><span class="status-dot"></span> Historical archive <span class="divider"></span> 23 Aug 2026</div>
-      <button class="icon-button" id="feedButton" title="Open feed importer" aria-label="Open feed importer">↗</button>
     </header>
 
     <main id="top">
@@ -54,7 +53,6 @@
             <div class="corridor corridor-three" data-corridor="madison"><span>03</span></div>
             <div class="map-label label-bottom">IOWA ROADS <span>•</span> DES MOINES AREA</div>
             <div class="map-scale"><span></span> 5 mi</div>
-            <div class="map-controls"><button class="map-control" id="locateMe" aria-label="Show my current location" title="Show my current location">●</button><button class="map-control" id="zoomIn" aria-label="Zoom in">+</button><button class="map-control" id="zoomOut" aria-label="Zoom out">−</button></div>
           </div>
           <div class="map-footer"><span><b class="legend-line active-line"></b> elevated risk</span><span><b class="legend-line quiet-line"></b> monitored</span><span class="mono" id="feedUpdated">Loading historical data</span></div>
         </div>
@@ -64,7 +62,6 @@
             <div class="alert-head"><span class="signal-icon">!</span><span class="kicker">Driver message / preview</span><span class="live-chip">ARCHIVE</span></div>
             <div class="alert-content"><h2 id="alertTitle">Historical risk pattern</h2><p id="alertMessage">This corridor has repeated wildlife activity in the selected archive. Use seasonal context; this is not a live animal alert.</p></div>
             <div class="alert-route"><span>Next 4.2 mi</span><span class="route-line"></span><span id="alertSpecies">Elk movement</span></div>
-            <button class="primary-button" id="previewButton">Preview map message <span>→</span></button>
           </article>
           <article class="stats-panel panel">
             <div class="stat"><span class="kicker">Corridors watched</span><strong>12</strong><span class="stat-note">across 3 districts</span></div>
@@ -75,23 +72,8 @@
       </section>
 
       <section class="corridor-section">
-        <div class="section-heading"><div><span class="kicker">Signal register</span><h2>Active corridors</h2></div><button class="text-button" id="allCorridors">View all <span>↗</span></button></div>
+        <div class="section-heading"><div><span class="kicker">Signal register</span><h2>Active corridors</h2></div></div>
         <div class="corridor-list" id="corridorList"></div>
-      </section>
-
-      <section class="risk-section">
-        <div class="section-heading"><div><span class="kicker">Pilot planning index / illustrative</span><h2>Top wildlife collision areas</h2></div><span class="mono">8 areas indexed</span></div>
-        <div class="risk-toolbar"><label class="search-box" for="riskSearch"><span>⌕</span><input id="riskSearch" type="search" placeholder="Search by state, road, or animal" aria-label="Search top wildlife collision areas"></label><button class="secondary-button" id="approachButton">Enable approach alerts</button><button class="secondary-button" id="backgroundAlertButton">Enable background alerts (Android app)</button><button class="secondary-button" id="simulateIowaButton">Simulate Iowa alert</button><button class="secondary-button" id="simulateDesMoinesButton">Simulate Des Moines alert</button></div>
-        <div class="risk-list" id="riskList"></div>
-        <p class="data-note">Planning seed only: replace these illustrative areas with verified state DOT or wildlife-agency collision data before public use.</p>
-      </section>
-
-      <section class="feed-section panel" id="feedSection">
-        <div class="feed-copy"><span class="kicker">Historical archive bridge</span><h2>Find the road’s recurring patterns.</h2><p>Paste an approved Waze archive export or partner JSON. Pause for Paws groups coordinate events into evidence for corridor planning, seasonal signage, and future map publication.</p><div class="feed-notes"><span>CSV + JSON accepted</span><span>Stable corridor IDs</span><span>No live tracking</span></div></div>
-        <form class="feed-form" id="feedForm"><label for="feedInput">Historical coordinate archive <span>CSV or JSON</span></label><div class="archive-actions"><button class="secondary-button" type="button" id="refreshFeedButton">Refresh approved data</button><button class="secondary-button" type="button" id="loadIowaButton">Load ICAT 2025 Iowa data</button><button class="secondary-button" type="button" id="loadMetroButton">Show Des Moines area</button><span id="archiveSource">Bundled fallback</span></div><textarea id="feedInput" spellcheck="false">id,lat,lng,species,confidence,reportedAt
-      wz-191-elk-01,45.104,-110.741,Elk,0.94,2026-05-23T18:42:00Z
-      wz-191-elk-02,45.116,-110.728,Elk,0.89,2026-06-11T18:51:00Z
-      wz-191-deer-03,45.109,-110.735,Mule deer,0.86,2026-07-18T19:04:00Z</textarea><div class="form-actions"><span class="form-status" id="formStatus">Awaiting archive</span><button class="primary-button" type="submit">Analyze archive <span>→</span></button></div></form>
       </section>
     </main>
     <footer><span>Pause for Paws / field prototype</span><span>Data is illustrative. Partner approval and legal review required before deployment.</span></footer>
