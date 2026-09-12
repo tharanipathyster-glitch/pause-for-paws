@@ -2,6 +2,10 @@
 
 A standalone prototype for turning wildlife detection coordinates into a corridor-level driver alert.
 
+## Data credit
+
+Crash data referenced by this project comes from the [Iowa Department of Transportation Open Data portal](https://public-iowadot.opendata.arcgis.com/) (Crash Data / SOR dataset). Iowa DOT does not endorse this project. This app performs its own historical pattern analysis on that data; it is not an official Iowa DOT product, and figures shown are illustrative unless explicitly sourced. Data may be incomplete, delayed, or revised upstream — always drive to conditions, not to this app.
+
 ## Run it
 
 Run `py server.py`, then open `http://localhost:5500/index.html`. The server provides the website, reads [waze-archive-test-data.csv](waze-archive-test-data.csv), and exposes `POST /api/analyze` for archive processing. Opening [index.html](index.html) directly still works as a front-end fallback, but backend analysis requires the server.
