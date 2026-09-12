@@ -8,7 +8,7 @@
     "serve": "python -m http.server 5500",
     "dev": "python -m http.server 5500",
     "build": "echo 'Static site build complete. No bundler is required for this prototype.'",
-    "android:sync": "npx cap sync android",
+    "android:sync": "node scripts/sync-android.js && npx cap sync android",
     "android:open": "npx cap open android",
     "android:run": "npx cap run android",
     "android:build": "npx cap build android"
