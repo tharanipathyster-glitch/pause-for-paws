@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pause-for-paws",
+      "runtimeExecutable": "py",
+      "runtimeArgs": ["server.py"],
+      "port": 5500
+    }
+  ]
+}

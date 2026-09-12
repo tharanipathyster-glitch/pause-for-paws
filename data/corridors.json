@@ -1,45 +1,81 @@
-{
-  "updatedAt": "2026-09-06T12:00:00Z",
-  "expiresAt": "2026-12-05T12:00:00Z",
-  "source": "Pause for Paws historical prototype feed; includes a user-reported Waukee coyote crossing that requires periodic review",
-  "dataType": "historical",
-  "events": [
-    {
-      "id": "prototype-001",
-      "lat": 41.5807,
-      "lng": -93.8620,
-      "species": "Animal-related crash",
-      "confidence": 0.8,
-      "reportedAt": "2025-05-23T18:42:00Z",
-      "road": "Iowa roads"
-    },
-    {
-      "id": "prototype-002",
-      "lat": 41.5920,
-      "lng": -93.8500,
-      "species": "Animal-related crash",
-      "confidence": 0.8,
-      "reportedAt": "2025-06-11T18:51:00Z",
-      "road": "Iowa roads"
-    },
-    {
-      "id": "prototype-003",
-      "lat": 41.5710,
-      "lng": -93.8750,
-      "species": "Animal-related crash",
-      "confidence": 0.8,
-      "reportedAt": "2025-07-18T19:04:00Z",
-      "road": "Iowa roads"
-    },
-    {
-      "id": "waukee-esker-florence-coyote-001",
-      "lat": 41.5811505,
-      "lng": -93.8617349,
-      "species": "Coyote",
-      "confidence": 0.5,
-      "reportedAt": "2026-09-06T12:00:00Z",
-      "road": "SE Florence Dr & SE Esker Ridge Dr, Waukee, IA",
-      "source": "User-reported historical crossing; review before extending expiry"
-    }
-  ]
+﻿{
+    "updatedAt":  "2026-09-12T00:00:00Z",
+    "expiresAt":  "2027-01-15T00:00:00Z",
+    "source":  "Iowa DOT Crash Data (Traffic Safety / Crash_Data feature service), animal-related crashes (First Harmful Event = Collision with Animal), 2025, clustered by county",
+    "dataType":  "historical",
+    "totalCount":  987,
+    "events":  [
+                   {
+                       "id":  "01",
+                       "name":  "Polk County corridor",
+                       "lat":  41.65553,
+                       "lng":  -93.59665,
+                       "species":  "Animal-related crashes",
+                       "confidence":  0.8,
+                       "reportedAt":  "2025-12-25T00:00:00Z",
+                       "road":  "Polk County IA",
+                       "count":  241,
+                       "risk":  "Elevated"
+                   },
+                   {
+                       "id":  "02",
+                       "name":  "Story County corridor",
+                       "lat":  42.02286,
+                       "lng":  -93.55926,
+                       "species":  "Animal-related crashes",
+                       "confidence":  0.8,
+                       "reportedAt":  "2025-12-30T00:00:00Z",
+                       "road":  "Story County IA",
+                       "count":  205,
+                       "risk":  "Elevated"
+                   },
+                   {
+                       "id":  "03",
+                       "name":  "Dallas County corridor",
+                       "lat":  41.63857,
+                       "lng":  -93.98429,
+                       "species":  "Animal-related crashes",
+                       "confidence":  0.8,
+                       "reportedAt":  "2025-12-31T00:00:00Z",
+                       "road":  "Dallas County IA",
+                       "count":  174,
+                       "risk":  "Elevated"
+                   },
+                   {
+                       "id":  "04",
+                       "name":  "Warren County corridor",
+                       "lat":  41.37688,
+                       "lng":  -93.61094,
+                       "species":  "Animal-related crashes",
+                       "confidence":  0.8,
+                       "reportedAt":  "2025-12-31T00:00:00Z",
+                       "road":  "Warren County IA",
+                       "count":  166,
+                       "risk":  "Elevated"
+                   },
+                   {
+                       "id":  "05",
+                       "name":  "Jasper County corridor",
+                       "lat":  41.70903,
+                       "lng":  -93.08754,
+                       "species":  "Animal-related crashes",
+                       "confidence":  0.8,
+                       "reportedAt":  "2025-12-28T00:00:00Z",
+                       "road":  "Jasper County IA",
+                       "count":  141,
+                       "risk":  "Monitored"
+                   },
+                   {
+                       "id":  "06",
+                       "name":  "Madison County corridor",
+                       "lat":  41.34361,
+                       "lng":  -93.97539,
+                       "species":  "Animal-related crashes",
+                       "confidence":  0.8,
+                       "reportedAt":  "2025-12-31T00:00:00Z",
+                       "road":  "Madison County IA",
+                       "count":  60,
+                       "risk":  "Monitored"
+                   }
+               ]
 }
