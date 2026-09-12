@@ -1,7 +1,10 @@
 const demoCorridors = [
-  { id: "01", name: "Polk County approach", species: "Animal-related crashes", detail: "Iowa roads / Des Moines area", risk: "Elevated", confidence: 94, detections: 12 },
-  { id: "02", name: "Dallas County corridor", species: "Animal-related crashes", detail: "Iowa roads / Dallas County", risk: "Elevated", confidence: 88, detections: 8 },
-  { id: "03", name: "Warren County passage", species: "Animal-related crashes", detail: "Iowa roads / Warren County", risk: "Monitored", confidence: 76, detections: 4 }
+  { id: "01", name: "Polk County corridor", species: "Animal-related crashes", risk: "Elevated", count: 241 },
+  { id: "02", name: "Story County corridor", species: "Animal-related crashes", risk: "Elevated", count: 205 },
+  { id: "03", name: "Dallas County corridor", species: "Animal-related crashes", risk: "Elevated", count: 174 },
+  { id: "04", name: "Warren County corridor", species: "Animal-related crashes", risk: "Elevated", count: 166 },
+  { id: "05", name: "Jasper County corridor", species: "Animal-related crashes", risk: "Monitored", count: 141 },
+  { id: "06", name: "Madison County corridor", species: "Animal-related crashes", risk: "Monitored", count: 60 }
 ];
 const REMOTE_FEED_URL = "data/corridors.json";
 const corridorList = document.querySelector("#corridorList");
@@ -52,16 +55,16 @@ function renderGoogleEvents(events) {
   const bounds = new google.maps.LatLngBounds();
   events.forEach((event) => {
     const position = { lat: Number(event.lat), lng: Number(event.lng) };
-    const marker = new google.maps.Marker({ position, map: googleMap, title: `${event.species || "Wildlife"} historical detection`, opacity: .8 });
+    const count = Number(event.count);
+    const title = count ? `${event.species || "Wildlife"} — ${count} in 2025` : `${event.species || "Wildlife"} historical detection`;
+    const marker = new google.maps.Marker({ position, map: googleMap, title, opacity: .8 });
     marker.addListener("click", () => updateDriverMessage(event.species || "Animal-related wildlife", event.road || "Historical Iowa crash pattern"));
     googleMarkers.push(marker);
     bounds.extend(position);
+    const color = event.risk === "Monitored" ? "#3f6b52" : "#df6e51";
+    const radius = count ? Math.min(2000 + count * 20, 15000) : 3500;
+    googleCircles.push(new google.maps.Circle({ map: googleMap, center: position, radius, fillColor: color, fillOpacity: .16, strokeColor: color, strokeOpacity: .7, strokeWeight: 2 }));
   });
-  if (events.length > 1) {
-    const center = events.reduce((sum, event) => ({ lat: sum.lat + Number(event.lat), lng: sum.lng + Number(event.lng) }), { lat: 0, lng: 0 });
-    center.lat /= events.length; center.lng /= events.length;
-    googleCircles.push(new google.maps.Circle({ map: googleMap, center, radius: 3500, fillColor: "#df6e51", fillOpacity: .16, strokeColor: "#df6e51", strokeOpacity: .7, strokeWeight: 2 }));
-  }
   googleMap.fitBounds(bounds, 60);
   if (currentLocationCoordinates) centerMapOnCurrentLocation();
 }
@@ -95,7 +98,7 @@ function renderCorridors(corridors = demoCorridors) {
       <span class="row-name">${corridor.name}</span>
       <span class="row-species">${corridor.species}</span>
       <span class="risk-pill ${corridor.risk === "Monitored" ? "low-risk" : ""}">${corridor.risk}</span>
-      <span class="row-arrow">?</span>
+      <span class="row-arrow">&rarr;</span>
     </div>`).join("");
 }
 
@@ -131,15 +134,16 @@ function validateFeed(payload) {
   return valid;
 }
 
-function applyBackendAnalysis(analysis, payload, sourceLabel) {
+function applyBackendAnalysis(analysis, payload, sourceLabel, totalCount) {
   const averageConfidence = analysis?.confidence || Math.round(payload.reduce((sum, item) => sum + (Number(item.confidence) || .5), 0) / payload.length * 100);
   const species = [...new Set(payload.map((item) => item.species).filter(Boolean))].join(" + ") || "Wildlife";
   document.querySelector("#confidenceValue").innerHTML = `${averageConfidence}<small>%</small>`;
-  document.querySelector("#signalsCount").textContent = String(27 + payload.length);
+  document.querySelector("#signalsCount").textContent = String(27 + (Number(totalCount) || payload.length));
   document.querySelector("#alertSpecies").textContent = `${species} movement`;
   document.querySelector("#feedUpdated").textContent = remoteFeedState.updatedAt ? `Updated ${formatFeedDate(remoteFeedState.updatedAt)}` : sourceLabel;
   renderGoogleEvents(payload);
   if (analysis?.clusters) renderCorridors(analysis.clusters.slice().sort((first, second) => second.events - first.events).slice(0, 60).map((cluster) => ({ id: cluster.id, name: `Historical cluster ${cluster.id}`, species: cluster.species, detail: `${cluster.events} events / ${cluster.center.lat.toFixed(3)}, ${cluster.center.lng.toFixed(3)}`, risk: cluster.risk, confidence: cluster.confidence })));
+  else if (payload.every((item) => item.name && item.risk)) renderCorridors(payload);
 }
 
 function formatFeedDate(value) {
@@ -156,7 +160,7 @@ async function loadRemoteHistoricalFeed() {
     if (feed.expiresAt && new Date(feed.expiresAt) <= new Date()) throw new Error("Remote feed has expired");
     const payload = validateFeed(feed.events);
     remoteFeedState = { updatedAt: feed.updatedAt, expiresAt: feed.expiresAt, source: feed.source || "Remote historical feed" };
-    applyBackendAnalysis(null, payload, remoteFeedState.source);
+    applyBackendAnalysis(null, payload, remoteFeedState.source, feed.totalCount);
   } catch (error) {
     remoteFeedState = { updatedAt: null, expiresAt: null, source: "Bundled fallback" };
     try {
