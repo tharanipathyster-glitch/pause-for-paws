@@ -1,9 +1,9 @@
 ﻿{
     "updatedAt":  "2026-09-12T00:00:00Z",
     "expiresAt":  "2027-01-15T00:00:00Z",
-    "source":  "Iowa DOT Crash Data (Traffic Safety / Crash_Data feature service), animal-related crashes (First Harmful Event = Collision with Animal), 2025, clustered by county",
+    "source":  "Iowa DOT Crash Data (Traffic Safety / Crash_Data feature service), animal-related crashes (First Harmful Event = Collision with Animal), 2025, clustered by county; plus one reviewed user-reported crossing",
     "dataType":  "historical",
-    "totalCount":  987,
+    "totalCount":  988,
     "events":  [
                    {
                        "id":  "01",
@@ -76,6 +76,19 @@
                        "road":  "Madison County IA",
                        "count":  60,
                        "risk":  "Monitored"
+                   },
+                   {
+                       "id":  "07",
+                       "name":  "Waukee coyote crossing",
+                       "lat":  41.5811505,
+                       "lng":  -93.8617349,
+                       "species":  "Coyote",
+                       "confidence":  0.5,
+                       "reportedAt":  "2026-09-06T12:00:00Z",
+                       "road":  "SE Florence Dr and SE Esker Ridge Dr Waukee IA",
+                       "count":  1,
+                       "risk":  "Monitored",
+                       "note":  "User-reported historical crossing; reviewed, subject to periodic re-review before extending expiry"
                    }
                ]
 }

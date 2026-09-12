@@ -1,7 +1,10 @@
 const demoCorridors = [
-  { id: "01", name: "Polk County approach", species: "Animal-related crashes", detail: "Iowa roads / Des Moines area", risk: "Elevated", confidence: 94, detections: 12 },
-  { id: "02", name: "Dallas County corridor", species: "Animal-related crashes", detail: "Iowa roads / Dallas County", risk: "Elevated", confidence: 88, detections: 8 },
-  { id: "03", name: "Warren County passage", species: "Animal-related crashes", detail: "Iowa roads / Warren County", risk: "Monitored", confidence: 76, detections: 4 }
+  { id: "01", name: "Polk County corridor", species: "Animal-related crashes", risk: "Elevated", count: 241 },
+  { id: "02", name: "Story County corridor", species: "Animal-related crashes", risk: "Elevated", count: 205 },
+  { id: "03", name: "Dallas County corridor", species: "Animal-related crashes", risk: "Elevated", count: 174 },
+  { id: "04", name: "Warren County corridor", species: "Animal-related crashes", risk: "Elevated", count: 166 },
+  { id: "05", name: "Jasper County corridor", species: "Animal-related crashes", risk: "Monitored", count: 141 },
+  { id: "06", name: "Madison County corridor", species: "Animal-related crashes", risk: "Monitored", count: 60 }
 ];
 const REMOTE_FEED_URL = "data/corridors.json";
 const corridorList = document.querySelector("#corridorList");

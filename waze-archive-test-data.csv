@@ -5,3 +5,4 @@ id,lat,lng,species,confidence,reportedAt,road,count,risk
 04,41.37688,-93.61094,Animal-related crashes,0.8,2025-12-31T00:00:00Z,Warren County IA,166,Elevated
 05,41.70903,-93.08754,Animal-related crashes,0.8,2025-12-28T00:00:00Z,Jasper County IA,141,Monitored
 06,41.34361,-93.97539,Animal-related crashes,0.8,2025-12-31T00:00:00Z,Madison County IA,60,Monitored
+07,41.5811505,-93.8617349,Coyote,0.5,2026-09-06T12:00:00Z,SE Florence Dr and SE Esker Ridge Dr Waukee IA,1,Monitored
