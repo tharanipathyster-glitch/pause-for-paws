@@ -95,7 +95,7 @@ function renderCorridors(corridors = demoCorridors) {
       <span class="row-name">${corridor.name}</span>
       <span class="row-species">${corridor.species}</span>
       <span class="risk-pill ${corridor.risk === "Monitored" ? "low-risk" : ""}">${corridor.risk}</span>
-      <span class="row-arrow">?</span>
+      <span class="row-arrow">&rarr;</span>
     </div>`).join("");
 }
 
