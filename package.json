@@ -8,15 +8,20 @@
     "serve": "python -m http.server 5500",
     "dev": "python -m http.server 5500",
     "build": "echo 'Static site build complete. No bundler is required for this prototype.'",
-    "android:sync": "node scripts/sync-android.js && npx cap sync android",
+    "android:sync": "node scripts/sync-web.js && npx cap sync android",
     "android:open": "npx cap open android",
     "android:run": "npx cap run android",
-    "android:build": "npx cap build android"
+    "android:build": "npx cap build android",
+    "ios:sync": "node scripts/sync-web.js && npx cap sync ios",
+    "ios:open": "npx cap open ios",
+    "ios:run": "npx cap run ios",
+    "ios:build": "npx cap build ios"
   },
   "devDependencies": {
-    "@capacitor/android": "^6.1.2",
-    "@capacitor/cli": "^6.1.2",
-    "@capacitor/core": "^6.1.2",
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/cli": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/ios": "^6.2.1",
     "typescript": "^5.6.3"
   }
 }
