@@ -1,221 +1,306 @@
-const demoCorridors = [
-  { id: "01", name: "Polk County corridor", species: "Animal-related crashes", risk: "Elevated", count: 241 },
-  { id: "02", name: "Story County corridor", species: "Animal-related crashes", risk: "Elevated", count: 205 },
-  { id: "03", name: "Dallas County corridor", species: "Animal-related crashes", risk: "Elevated", count: 174 },
-  { id: "04", name: "Warren County corridor", species: "Animal-related crashes", risk: "Elevated", count: 166 },
-  { id: "05", name: "Jasper County corridor", species: "Animal-related crashes", risk: "Monitored", count: 141 },
-  { id: "06", name: "Madison County corridor", species: "Animal-related crashes", risk: "Monitored", count: 60 }
-];
-const REMOTE_FEED_URL = "data/corridors.json";
-const corridorList = document.querySelector("#corridorList");
-const toast = document.querySelector("#toast");
-let googleMap;
-let googleMarkers = [];
-let googleCircles = [];
-let latestEvents = [];
-let currentLocationCoordinates;
-let currentLocationMarker;
-let remoteFeedState = { updatedAt: null, expiresAt: null, source: "Bundled fallback" };
+/* Pause for Paws — static front end.
+   Reads corridors.json (precomputed from Iowa DOT 2025 crash records).
+   No backend required: this page works on any static host. */
 
-function loadGoogleMap() {
-  const mapCanvas = document.querySelector("#mapCanvas");
-  if (!window.GOOGLE_MAPS_API_KEY) {
-    showToast("Showing the built-in historical map view");
-    return;
-  }
-  window.gm_authFailure = () => {
-    mapCanvas.classList.remove("google-map-ready");
-    mapCanvas.querySelectorAll(":scope > div").forEach((child) => {
-      if (child.querySelector(".gm-style") || child.textContent.includes("Oops! Something went wrong")) child.remove();
-    });
-    showToast("Google Maps access was rejected; historical map view remains available");
-  };
-  window.initGoogleMap = () => {
-    googleMap = new google.maps.Map(document.querySelector("#mapCanvas"), {
-      center: { lat: 45.2, lng: -110.7 }, zoom: 9, mapTypeControl: false,
-      streetViewControl: false, fullscreenControl: false, clickableIcons: false, zoomControl: true
-    });
-    document.querySelector("#mapCanvas").classList.add("google-map-ready");
-    renderGoogleEvents(latestEvents);
-    showCurrentLocation(true);
-  };
-  const script = document.createElement("script");
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(window.GOOGLE_MAPS_API_KEY)}&callback=initGoogleMap&loading=async&v=weekly`;
-  script.async = true;
-  script.defer = true;
-  script.onerror = () => showToast("Google Maps could not load; historical map view remains active");
-  document.head.appendChild(script);
-}
+const SIGHTING_FORM_URL = ""; // <-- paste your Google Form link here
 
-function renderGoogleEvents(events) {
-  latestEvents = events;
-  if (!googleMap || !window.google) return;
-  googleMarkers.forEach((marker) => marker.setMap(null));
-  googleCircles.forEach((circle) => circle.setMap(null));
-  const bounds = new google.maps.LatLngBounds();
-  events.forEach((event) => {
-    const position = { lat: Number(event.lat), lng: Number(event.lng) };
-    const count = Number(event.count);
-    const title = count ? `${event.species || "Wildlife"} — ${count} in 2025` : `${event.species || "Wildlife"} historical detection`;
-    const marker = new google.maps.Marker({ position, map: googleMap, title, opacity: .8 });
-    marker.addListener("click", () => updateDriverMessage(event.species || "Animal-related wildlife", event.road || "Historical Iowa crash pattern"));
-    googleMarkers.push(marker);
-    bounds.extend(position);
-    const color = event.risk === "Monitored" ? "#3f6b52" : "#df6e51";
-    const radius = count ? Math.min(2000 + count * 20, 15000) : 3500;
-    googleCircles.push(new google.maps.Circle({ map: googleMap, center: position, radius, fillColor: color, fillOpacity: .16, strokeColor: color, strokeOpacity: .7, strokeWeight: 2 }));
-  });
-  googleMap.fitBounds(bounds, 60);
-  if (currentLocationCoordinates) centerMapOnCurrentLocation();
-}
+let DATA = null;
+let view = "statewide";
+let selectedMonth = new Date().getMonth(); // 0-11, defaults to the current calendar month
+let googleMap = null;
+let mapShapes = [];
 
-function centerMapOnCurrentLocation() {
-  if (!googleMap || !currentLocationCoordinates) return;
-  googleMap.panTo(currentLocationCoordinates);
-  googleMap.setZoom(13);
-  if (currentLocationMarker) currentLocationMarker.setMap(null);
-  currentLocationMarker = new google.maps.Marker({ position: currentLocationCoordinates, map: googleMap, title: "Your current location", label: "You" });
-}
-
-function updateDriverMessage(activity, locationLabel) {
-  document.querySelector("#mapTitle").textContent = locationLabel;
-  document.querySelector("#alertTitle").textContent = "Pause for Paws";
-  document.querySelector("#alertMessage").textContent = `Historical ${activity.toLowerCase()} activity has been recorded in this corridor. Slow down and watch both shoulders. This is not a live animal location.`;
-  document.querySelector("#alertSpecies").textContent = `${activity} pattern`;
-}
-
-function showApproachPopup(details) {
-  const popup = document.querySelector("#approachPopup");
-  popup.querySelector("#popupMessage").textContent = `${details.road}. ${details.animals} activity is historically recorded here.`;
-  popup.classList.add("visible");
-  window.setTimeout(() => popup.classList.remove("visible"), 8000);
-}
-
-function renderCorridors(corridors = demoCorridors) {
-  corridorList.innerHTML = corridors.map((corridor) => `
-    <div class="corridor-row">
-      <span class="row-id">${corridor.id}</span>
-      <span class="row-name">${corridor.name}</span>
-      <span class="row-species">${corridor.species}</span>
-      <span class="risk-pill ${corridor.risk === "Monitored" ? "low-risk" : ""}">${corridor.risk}</span>
-      <span class="row-arrow">&rarr;</span>
-    </div>`).join("");
-}
+const $ = (sel) => document.querySelector(sel);
 
 function showToast(message) {
+  const toast = $("#toast");
   toast.textContent = message;
   toast.classList.add("show");
   window.setTimeout(() => toast.classList.remove("show"), 3000);
 }
 
-function parseCsv(text) {
-  const lines = text.trim().split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) throw new Error("CSV needs a header and at least one event.");
-  const headers = lines.shift().split(",").map((header) => header.trim());
-  return lines.map((line) => {
-    const values = line.split(",");
-    return headers.reduce((event, header, index) => ({ ...event, [header]: values[index]?.trim() }), {});
+function currentCorridors() {
+  if (!DATA) return [];
+  return view === "metro" ? DATA.desMoines.corridors : DATA.corridors;
+}
+
+/* ---------- header numbers ---------- */
+
+function renderStats() {
+  $("#dataStamp").textContent = `Iowa DOT crash records ${DATA.year}`;
+  $("#updatedStamp").textContent = `built ${formatIsoDate(DATA.generated)}`;
+  $("#statCrashesLabel").textContent = `Crashes in ${DATA.year}`;
+  $("#statCrashes").textContent = DATA.totalCrashes.toLocaleString();
+  $("#statInjury").textContent = DATA.injuryOrWorse.toLocaleString();
+  $("#statInjuryNote").textContent = DATA.fatal ? `includes ${DATA.fatal} deaths` : "injury or fatal crashes";
+
+  const peak = DATA.monthly.reduce((best, m) => (m.crashes > best.crashes ? m : best));
+  const yearTotal = DATA.monthly.reduce((sum, m) => sum + m.crashes, 0);
+  $("#statMonth").textContent = peak.month;
+  $("#statMonthNote").textContent =
+    `${peak.crashes.toLocaleString()} crashes — ${Math.round((peak.crashes / yearTotal) * 100)}% of the year`;
+}
+
+/* ---------- month chart ---------- */
+
+function renderMonthChart() {
+  const peak = Math.max(...DATA.monthly.map((m) => m.crashes));
+  $("#monthChart").innerHTML = DATA.monthly.map((m) => {
+    const pct = Math.round((m.crashes / peak) * 100);
+    const hot = m.crashes === peak ? " peak" : "";
+    return `<div class="month-col${hot}">
+      <span class="month-value">${m.crashes.toLocaleString()}</span>
+      <div class="bar-wrap"><div class="month-bar" style="height:${Math.max(pct, 3)}%"></div></div>
+      <span class="month-label">${m.month}</span>
+    </div>`;
+  }).join("");
+
+  const worst = DATA.topDates[0];
+  const novDates = DATA.topDates.filter((d) => d.date.startsWith("11")).length;
+  $("#monthNote").textContent =
+    `${novDates} of the 10 worst individual days in 2025 were in November. The worst single day was ` +
+    `${formatDate(worst.date)}, with ${worst.crashes} crashes in 24 hours.`;
+}
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+function formatDate(mmdd) {
+  const [m, d] = mmdd.split("-");
+  return `${MONTHS[Number(m) - 1]} ${Number(d)}`;
+}
+
+function formatIsoDate(iso) {
+  const [y, m, d] = String(iso).split("-").map(Number);
+  return y && m && d ? `${d} ${MONTHS[m - 1].slice(0, 3)} ${y}` : iso;
+}
+
+/* ---------- day-by-day chart for one month ---------- */
+
+function renderMonthPicker() {
+  $("#monthPicker").innerHTML = DATA.monthly.map((m, i) =>
+    `<button class="month-pill${i === selectedMonth ? " active" : ""}" data-month="${i}" role="tab" aria-selected="${i === selectedMonth}">${m.month}</button>`
+  ).join("");
+  $("#monthPicker").querySelectorAll(".month-pill").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedMonth = Number(button.dataset.month);
+      renderMonthPicker();
+      renderDayChart();
+    });
   });
 }
 
-function parseArchive(text) {
-  const trimmed = text.trim();
-  try {
-    return trimmed.startsWith("[") ? JSON.parse(trimmed) : parseCsv(trimmed);
-  } catch (error) {
-    throw new Error(error.message.includes("CSV") ? error.message : "Archive must be valid JSON or CSV.");
-  }
+function renderDayChart() {
+  const days = DATA.daily[selectedMonth] || [];
+  const total = days.reduce((sum, n) => sum + n, 0);
+  const peak = Math.max(...days, 1);
+  const isCurrentMonth = selectedMonth === new Date().getMonth();
+
+  $("#dayTitle").textContent = `${MONTHS[selectedMonth]} ${DATA.year}${isCurrentMonth ? " (this month, last year)" : ""}`;
+  $("#dayTotal").textContent = `${total.toLocaleString()} crashes / ${(total / days.length).toFixed(1)} per day`;
+
+  $("#dayChart").innerHTML = days.map((n, i) => {
+    const pct = Math.round((n / peak) * 100);
+    const hot = n === peak ? " peak" : "";
+    return `<div class="day-col${hot}" title="${MONTHS[selectedMonth]} ${i + 1}: ${n} crashes">
+      <span class="day-value">${n}</span>
+      <div class="bar-wrap"><div class="day-bar" style="height:${Math.max(pct, 2)}%"></div></div>
+      <span class="day-label">${i + 1}</span>
+    </div>`;
+  }).join("");
+
+  const worstDay = days.indexOf(peak) + 1;
+  const quietDays = days.filter((n) => n === 0).length;
+  const share = Math.round((total / DATA.totalCrashes) * 100);
+  $("#dayNote").textContent =
+    `${MONTHS[selectedMonth]} had ${total.toLocaleString()} animal-related crashes, ${share}% of the year. ` +
+    `The worst day was ${MONTHS[selectedMonth]} ${worstDay} with ${peak}. ` +
+    (quietDays ? `${quietDays} day${quietDays === 1 ? "" : "s"} had none.` : `Every single day had at least one.`);
 }
 
-function validateFeed(payload) {
-  if (!Array.isArray(payload) || payload.length === 0) throw new Error("Feed must be a non-empty JSON array.");
-  const valid = payload.filter((item) => Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lng)));
-  if (valid.length !== payload.length) throw new Error("Every event needs numeric lat and lng coordinates.");
-  return valid;
+function renderWeekdayStrip() {
+  const peak = Math.max(...DATA.weekday.map((d) => d.crashes));
+  $("#weekdayStrip").innerHTML = DATA.weekday.map((d) => `
+    <div class="weekday${d.crashes === peak ? " peak" : ""}">
+      <span class="kicker">${d.day}</span>
+      <strong>${d.crashes.toLocaleString()}</strong>
+      <div class="weekday-bar"><div style="width:${Math.round((d.crashes / peak) * 100)}%"></div></div>
+    </div>`).join("");
+  const worst = DATA.weekday.find((d) => d.crashes === peak);
+  const best = DATA.weekday.reduce((a, b) => (b.crashes < a.crashes ? b : a));
+  $("#weekdayNote").textContent =
+    `Across the whole year, ${worst.day} is the worst day of the week (${worst.crashes.toLocaleString()} crashes) and ${best.day} the quietest (${best.crashes.toLocaleString()}).`;
 }
 
-function applyBackendAnalysis(analysis, payload, sourceLabel, totalCount) {
-  const averageConfidence = analysis?.confidence || Math.round(payload.reduce((sum, item) => sum + (Number(item.confidence) || .5), 0) / payload.length * 100);
-  const species = [...new Set(payload.map((item) => item.species).filter(Boolean))].join(" + ") || "Wildlife";
-  document.querySelector("#confidenceValue").innerHTML = `${averageConfidence}<small>%</small>`;
-  document.querySelector("#signalsCount").textContent = String(27 + (Number(totalCount) || payload.length));
-  document.querySelector("#alertSpecies").textContent = `${species} movement`;
-  document.querySelector("#feedUpdated").textContent = remoteFeedState.updatedAt ? `Updated ${formatFeedDate(remoteFeedState.updatedAt)}` : sourceLabel;
-  renderGoogleEvents(payload);
-  if (analysis?.clusters) renderCorridors(analysis.clusters.slice().sort((first, second) => second.events - first.events).slice(0, 60).map((cluster) => ({ id: cluster.id, name: `Historical cluster ${cluster.id}`, species: cluster.species, detail: `${cluster.events} events / ${cluster.center.lat.toFixed(3)}, ${cluster.center.lng.toFixed(3)}`, risk: cluster.risk, confidence: cluster.confidence })));
-  else if (payload.every((item) => item.name && item.risk)) renderCorridors(payload);
-}
+/* ---------- corridor table ---------- */
 
-function formatFeedDate(value) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "date unavailable" : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
+function renderCorridorList(list) {
+  const rows = list.slice(0, 25);
+  $("#corridorCount").textContent = `${list.length.toLocaleString()} corridors`;
+  $("#corridorList").innerHTML = rows.length ? rows.map((c, i) => `
+    <article class="risk-row" data-id="${c.id}">
+      <div class="risk-rank">${i + 1}</div>
+      <div><strong>${c.id}</strong><span>${c.lat.toFixed(3)}, ${c.lng.toFixed(3)}</span></div>
+      <div class="risk-animals">${c.risk}</div>
+      <div class="risk-score"><b>${c.crashes}</b><span>crashes in 2025</span></div>
+      <button class="simulate-button" data-id="${c.id}">Show driver message <span>→</span></button>
+    </article>`).join("") : `<p class="empty-state">No corridors match that search.</p>`;
 
-async function loadRemoteHistoricalFeed() {
-  try {
-    const response = await fetch(`${REMOTE_FEED_URL}?t=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Remote feed returned ${response.status}`);
-    const feed = await response.json();
-    if (!feed.updatedAt || !Array.isArray(feed.events) || !feed.events.length) throw new Error("Remote feed has no historical events");
-    if (feed.expiresAt && new Date(feed.expiresAt) <= new Date()) throw new Error("Remote feed has expired");
-    const payload = validateFeed(feed.events);
-    remoteFeedState = { updatedAt: feed.updatedAt, expiresAt: feed.expiresAt, source: feed.source || "Remote historical feed" };
-    applyBackendAnalysis(null, payload, remoteFeedState.source, feed.totalCount);
-  } catch (error) {
-    remoteFeedState = { updatedAt: null, expiresAt: null, source: "Bundled fallback" };
-    try {
-      const fallbackResponse = await fetch("/waze-archive-test-data.csv");
-      const fallbackPayload = validateFeed(parseArchive(await fallbackResponse.text()));
-      applyBackendAnalysis(null, fallbackPayload, "Bundled fallback archive");
-      document.querySelector("#feedUpdated").textContent = "Offline fallback";
-    } catch (fallbackError) {
-      document.querySelector("#feedUpdated").textContent = "Historical data unavailable";
-    }
-  }
-}
-
-document.querySelector("#closePopup").addEventListener("click", () => document.querySelector("#approachPopup").classList.remove("visible"));
-
-function distanceMiles(latOne, lngOne, latTwo, lngTwo) { const radians = Math.PI / 180; const latitude = (latTwo - latOne) * radians; const longitude = (lngTwo - lngOne) * radians; const value = Math.sin(latitude / 2) ** 2 + Math.cos(latOne * radians) * Math.cos(latTwo * radians) * Math.sin(longitude / 2) ** 2; return 3958.8 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value)); }
-
-function showCurrentLocation(isInitialLoad = false) {
-  if (!navigator.geolocation) return;
-  navigator.geolocation.getCurrentPosition((position) => {
-    currentLocationCoordinates = { lat: position.coords.latitude, lng: position.coords.longitude };
-    centerMapOnCurrentLocation();
-  }, () => undefined, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
-}
-
-const FOREGROUND_ALERT_RADIUS_MILES = 2;
-const FOREGROUND_ALERT_COOLDOWN_MS = 10 * 60 * 1000;
-let lastForegroundAlertAt = {};
-function startForegroundProximityWatch() {
-  if (!navigator.geolocation) return;
-  navigator.geolocation.watchPosition((position) => {
-    const { latitude, longitude } = position.coords;
-    latestEvents.forEach((event) => {
-      const distance = distanceMiles(latitude, longitude, Number(event.lat), Number(event.lng));
-      if (distance > FOREGROUND_ALERT_RADIUS_MILES) return;
-      const key = event.id || `${event.lat},${event.lng}`;
-      const now = Date.now();
-      if (lastForegroundAlertAt[key] && now - lastForegroundAlertAt[key] < FOREGROUND_ALERT_COOLDOWN_MS) return;
-      lastForegroundAlertAt[key] = now;
-      updateDriverMessage(event.species || "Wildlife", event.road || "Historical corridor");
-      showApproachPopup({ road: event.road || "This corridor", animals: event.species || "Wildlife" });
+  $("#corridorList").querySelectorAll(".simulate-button").forEach((button) => {
+    button.addEventListener("click", () => {
+      const corridor = currentCorridors().find((c) => c.id === button.dataset.id);
+      if (corridor) selectCorridor(corridor, true);
     });
-  }, () => undefined, { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 });
+  });
+
+  if (rows.length < list.length) {
+    $("#corridorList").insertAdjacentHTML("beforeend",
+      `<p class="empty-state">Showing the 25 worst of ${list.length.toLocaleString()} corridors. Search by ID to find others.</p>`);
+  }
 }
 
-document.querySelectorAll(".corridor").forEach((marker) => marker.addEventListener("click", () => {
-  const names = { canyon: "Gardiner gateway", elk: "Blacktail plateau", madison: "Madison bend" };
-  document.querySelector("#alertTitle").textContent = `${names[marker.dataset.corridor]} pattern`;
-  showToast(`${names[marker.dataset.corridor]} selected`);
-}));
-
-renderCorridors();
-loadGoogleMap();
-loadRemoteHistoricalFeed();
-startForegroundProximityWatch();
-if (window.Capacitor?.isNativePlatform?.()) {
-  window.Capacitor.Plugins.CorridorAlert.start().catch(() => undefined);
+function selectCorridor(corridor, pan) {
+  $("#alertTitle").textContent = "Pause for Paws";
+  $("#alertMessage").textContent =
+    `${corridor.crashes} animal-related crashes were recorded on this stretch of road in 2025` +
+    (corridor.injuryOrWorse ? `, and ${corridor.injuryOrWorse} of them hurt someone` : "") +
+    `. Slow down and watch both shoulders. This is a historical pattern, not a live animal location.`;
+  $("#alertSpecies").textContent = `${corridor.id} · ${corridor.risk}`;
+  if (pan && googleMap) {
+    googleMap.panTo({ lat: corridor.lat, lng: corridor.lng });
+    googleMap.setZoom(12);
+  }
+  showToast(`Corridor ${corridor.id} selected`);
 }
+
+/* ---------- map ---------- */
+
+function loadGoogleMap() {
+  if (!window.GOOGLE_MAPS_API_KEY) { mapUnavailable("No map key configured."); return; }
+  window.gm_authFailure = () => mapUnavailable("The map key was rejected. The table below has the same data.");
+  window.initGoogleMap = () => {
+    googleMap = new google.maps.Map($("#mapCanvas"), {
+      center: { lat: 41.9, lng: -93.5 }, zoom: 7, mapTypeControl: false,
+      streetViewControl: false, fullscreenControl: false, clickableIcons: false
+    });
+    $("#mapCanvas").classList.add("google-map-ready");
+    drawCorridors();
+  };
+  const script = document.createElement("script");
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(window.GOOGLE_MAPS_API_KEY)}&callback=initGoogleMap&v=weekly&loading=async`;
+  script.async = true;
+  script.onerror = () => mapUnavailable("The map could not load. The table below has the same data.");
+  document.head.appendChild(script);
+}
+
+function mapUnavailable(message) {
+  const fallback = $("#mapFallback");
+  if (!fallback) return;
+  fallback.innerHTML = `<strong>Map unavailable</strong><span>${message}</span>`;
+}
+
+function drawCorridors() {
+  if (!googleMap || !window.google || !DATA) return;
+  mapShapes.forEach((shape) => shape.setMap(null));
+  mapShapes = [];
+
+  const list = currentCorridors();
+  const bounds = new google.maps.LatLngBounds();
+
+  list.forEach((corridor) => {
+    const heavy = corridor.crashes >= 5;
+    const circle = new google.maps.Circle({
+      map: googleMap,
+      center: { lat: corridor.lat, lng: corridor.lng },
+      radius: 2000 + corridor.crashes * 120,
+      fillColor: heavy ? "#df6e51" : "#245c43",
+      fillOpacity: heavy ? 0.28 : 0.16,
+      strokeColor: heavy ? "#df6e51" : "#245c43",
+      strokeOpacity: 0.65,
+      strokeWeight: 1,
+      clickable: true,
+    });
+    circle.addListener("click", () => selectCorridor(corridor, false));
+    mapShapes.push(circle);
+    bounds.extend({ lat: corridor.lat, lng: corridor.lng });
+  });
+
+  (DATA.reports || []).forEach((report) => {
+    const marker = new google.maps.Marker({
+      map: googleMap,
+      position: { lat: report.lat, lng: report.lng },
+      title: `${report.species} reported by a driver: ${report.road}`,
+      label: { text: "!", color: "#13231e", fontWeight: "700" },
+    });
+    marker.addListener("click", () => {
+      $("#alertTitle").textContent = "Pause for Paws";
+      $("#alertMessage").textContent =
+        `A driver reported a ${report.species.toLowerCase()} crossing at ${report.road} on ${formatIsoDate(report.reportedOn)}. ` +
+        `This is a single reviewed report, not a crash record. Slow down and watch both shoulders.`;
+      $("#alertSpecies").textContent = `${report.id} / driver report`;
+      showToast("Driver report selected");
+    });
+    mapShapes.push(marker);
+  });
+
+  if (list.length) googleMap.fitBounds(bounds, 40);
+}
+
+/* Badge and footer counts must not depend on the map loading. */
+function renderMapMeta() {
+  const list = currentCorridors();
+  const total = list.reduce((sum, c) => sum + c.crashes, 0);
+  $("#mapCount").textContent = `${total.toLocaleString()} crashes mapped`;
+  $("#mapBadge").textContent = `${list.length.toLocaleString()} corridors`;
+}
+
+/* ---------- view switching ---------- */
+
+function setView(next) {
+  view = next;
+  $("#mapTitle").textContent = next === "metro" ? "Des Moines area" : "Iowa — statewide";
+  $("#viewStatewide").classList.toggle("active", next === "statewide");
+  $("#viewMetro").classList.toggle("active", next === "metro");
+  $("#corridorSearch").value = "";
+  renderCorridorList(currentCorridors());
+  renderMapMeta();
+  drawCorridors();
+}
+
+/* ---------- boot ---------- */
+
+$("#viewStatewide").addEventListener("click", () => setView("statewide"));
+$("#viewMetro").addEventListener("click", () => setView("metro"));
+$("#reportButton").addEventListener("click", () =>
+  $("#reportSection").scrollIntoView({ behavior: "smooth" }));
+$("#corridorSearch").addEventListener("input", (event) => {
+  const query = event.target.value.trim().toLowerCase();
+  renderCorridorList(currentCorridors().filter((c) => c.id.toLowerCase().includes(query)));
+});
+
+if (SIGHTING_FORM_URL) {
+  $("#reportLink").href = SIGHTING_FORM_URL;
+} else {
+  const link = $("#reportLink");
+  link.href = "mailto:hello@pauseforpawsusa.org?subject=Animal%20crossing%20sighting";
+  link.innerHTML = "Email us a sighting <span>→</span>";
+}
+
+fetch("corridors.json")
+  .then((response) => {
+    if (!response.ok) throw new Error("corridors.json not found");
+    return response.json();
+  })
+  .then((data) => {
+    DATA = data;
+    renderStats();
+    renderMonthChart();
+    renderMonthPicker();
+    renderDayChart();
+    renderWeekdayStrip();
+    setView("statewide");
+    loadGoogleMap();
+  })
+  .catch(() => {
+    mapUnavailable("Corridor data did not load.");
+    $("#corridorList").innerHTML = `<p class="empty-state">Corridor data did not load. Please refresh.</p>`;
+  });

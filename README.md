@@ -8,7 +8,17 @@ Crash data referenced by this project comes from the [Iowa Department of Transpo
 
 ## Run it
 
-Run `py server.py`, then open `http://localhost:5500/index.html`. The server provides the website, reads [waze-archive-test-data.csv](waze-archive-test-data.csv), and exposes `POST /api/analyze` for archive processing. Opening [index.html](index.html) directly still works as a front-end fallback, but backend analysis requires the server.
+The website is fully static. Serve the folder with any web server, for example `python -m http.server 5500`, then open `http://localhost:5500/index.html`.
+
+All the numbers on the page come from [corridors.json](corridors.json), which is generated from the Iowa DOT export [2025 - IA Data.csv](2025%20-%20IA%20Data.csv) by:
+
+```
+python precompute_corridors.py
+```
+
+Re-run that whenever the CSV changes (or a driver report is added to `USER_REPORTS` inside the script), then commit the regenerated `corridors.json`. The script produces the statewide and Des Moines-area corridor clusters, crashes per month, crashes per day for every month, crashes by day of the week, and the injury/fatality totals. Nothing on the page is typed in by hand.
+
+`server.py` and [waze-archive-test-data.csv](waze-archive-test-data.csv) are left over from the earlier prototype and are not used by the website.
 
 ## Legal and product framing
 

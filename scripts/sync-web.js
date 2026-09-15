@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const root = path.resolve(__dirname, "..");
-const files = ["index.html", "app.js", "styles.css", "privacy-policy.html", "waze-archive-test-data.csv"];
+const files = ["index.html", "app.js", "styles.css", "privacy-policy.html", "corridors.json", "waze-archive-test-data.csv"];
 
 for (const file of files) {
   fs.copyFileSync(path.join(root, file), path.join(root, "www", file));

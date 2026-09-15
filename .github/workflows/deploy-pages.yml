@@ -28,9 +28,8 @@ jobs:
         env:
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
-          mkdir -p dist/data
-          cp index.html app.js styles.css privacy-policy.html waze-archive-test-data.csv dist/
-          cp data/corridors.json dist/data/
+          mkdir -p dist
+          cp index.html app.js styles.css privacy-policy.html corridors.json dist/
           echo "window.GOOGLE_MAPS_API_KEY = \"$GOOGLE_MAPS_API_KEY\";" > dist/google-maps-config.js
           echo "pauseforpawsusa.org" > dist/CNAME
 
