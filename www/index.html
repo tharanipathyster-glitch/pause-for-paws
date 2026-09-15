@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#13231e">
-  <title>Pause for Paws | Wildlife corridor intelligence</title>
+  <title>Pause for Paws | Iowa animal-crash corridors</title>
+  <meta name="description" content="A map of the stretches of Iowa road where vehicle-animal crashes keep happening, built from live Iowa DOT crash records by a Waukee student robotics team.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -17,73 +18,131 @@
         <span class="brand-mark" aria-hidden="true">+</span>
           <span>pause <span>for paws</span></span>
       </a>
-      <div class="topbar-status"><span class="status-dot"></span> Historical archive <span class="divider"></span> 23 Aug 2026</div>
+      <div class="topbar-status"><span class="status-dot"></span> <span id="dataStamp">Iowa DOT crash records</span> <span class="divider"></span> <span id="updatedStamp">—</span></div>
     </header>
 
     <main id="top">
-      <div class="legal-banner" style="margin: 1rem 0 0; padding: 1rem 1.25rem; border: 1px solid rgba(223,110,81,.45); background: rgba(243,240,232,.9); border-radius: 16px; color: #13231e; font-size: 0.96rem; line-height: 1.5;">
-        <strong>Historical pattern notice:</strong> This app is for informational, historical corridor analysis only and does not provide live animal tracking or guarantee current wildlife presence on the road. Driver alerts are advisory, not a real-time detection system. Use approved data only and review all legal permissions before public release.
-        <div style="margin-top: .5rem;"><a href="privacy-policy.html" style="color: #1d3d2f; text-decoration: underline; font-weight: 600;">Privacy policy</a></div>
+      <div class="legal-banner">
+        <strong>Historical pattern notice:</strong> This site shows where animal-related crashes were recorded in the past. It is not live animal tracking and cannot tell you an animal is on the road right now. Driver messages are advisory only.
+        <a href="privacy-policy.html">Privacy policy &amp; disclaimer</a>
       </div>
       <section class="hero">
         <div>
-          <p class="eyebrow">Wildlife corridor intelligence / WY-191</p>
-          <h1>Slow down.<br><em>Something is moving.</em></h1>
-          <p class="hero-copy">A corridor-level signal for the moments when the road becomes habitat. Built for agency feeds, designed for drivers.</p>
+          <p class="eyebrow">Iowa / vehicle–animal crash corridors</p>
+          <h1>Slow down.<br><em>This is where it keeps happening.</em></h1>
+          <p class="hero-copy">We are a student robotics team in Waukee, Iowa. We take the state's own crash records, updated twice a month, and group them into the stretches of road where drivers keep hitting animals — so you can check your route before you drive it.</p>
         </div>
         <div class="hero-meta">
-          <span class="meta-label">Current operating mode</span>
-          <strong>Corridor state</strong>
-          <span>Not a live animal tracker</span>
+          <span class="meta-label">What this is</span>
+          <strong>A pattern, not a tracker</strong>
+          <span>Built from crashes already reported to Iowa DOT. We cannot tell you an animal is in the road right now.</span>
         </div>
       </section>
 
-      <section class="dashboard-grid" aria-label="Crossing corridor dashboard">
+      <div class="year-switch" id="yearSwitch" aria-label="Choose a year"></div>
+
+      <section class="dashboard-grid" aria-label="Iowa crash corridor map">
         <div class="map-panel panel">
           <div class="panel-heading">
-            <div><span class="kicker">Historical field view / Iowa pilot</span><h2 id="mapTitle">Des Moines area corridor</h2></div>
-            <span class="map-badge"><span class="status-dot"></span> Pattern detected</span>
+            <div><span class="kicker" id="mapKicker">Iowa DOT crash records</span><h2 id="mapTitle">Iowa, statewide</h2></div>
+            <span class="map-badge"><span class="status-dot"></span> <span id="mapBadge">Loading…</span></span>
           </div>
-          <div class="map-canvas" id="mapCanvas" aria-label="Google map showing historical wildlife crossing corridors">
-            <div class="map-label label-top">IOWA PILOT<br><small>HISTORICAL DATA</small></div>
-            <div class="road road-one"></div><div class="road road-two"></div><div class="road road-three"></div>
-            <div class="water"></div>
-            <div class="corridor corridor-one" data-corridor="canyon"><span>01</span></div>
-            <div class="corridor corridor-two" data-corridor="elk"><span>02</span></div>
-            <div class="corridor corridor-three" data-corridor="madison"><span>03</span></div>
-            <div class="map-label label-bottom">IOWA ROADS <span>•</span> DES MOINES AREA</div>
-            <div class="map-scale"><span></span> 5 mi</div>
+          <div class="map-canvas" id="mapCanvas" aria-label="Map of Iowa showing where vehicle-animal crashes were recorded">
+            <div class="map-fallback" id="mapFallback">
+              <strong>Map loading…</strong>
+              <span>If it does not appear, the corridor table below shows the same data.</span>
+            </div>
           </div>
-          <div class="map-footer"><span><b class="legend-line active-line"></b> elevated risk</span><span><b class="legend-line quiet-line"></b> monitored</span><span class="mono" id="feedUpdated">Loading historical data</span></div>
+          <div class="map-footer">
+            <span><b class="legend-line active-line"></b> 5 or more crashes</span>
+            <span><b class="legend-line quiet-line"></b> fewer than 5</span>
+            <span class="mono" id="mapCount">—</span>
+          </div>
         </div>
 
         <aside class="side-column">
-          <article class="alert-card panel" id="alertCard">
-            <div class="alert-head"><span class="signal-icon">!</span><span class="kicker">Driver message / preview</span><span class="live-chip">ARCHIVE</span></div>
-            <div class="alert-content"><h2 id="alertTitle">Historical risk pattern</h2><p id="alertMessage">This corridor has repeated wildlife activity in the selected archive. Use seasonal context; this is not a live animal alert.</p></div>
-            <div class="alert-route"><span>Next 4.2 mi</span><span class="route-line"></span><span id="alertSpecies">Elk movement</span></div>
+          <article class="alert-card" id="alertCard">
+            <div class="alert-head"><span class="signal-icon">!</span><span class="kicker">What a driver would see</span><span class="live-chip">EXAMPLE</span></div>
+            <div class="alert-content">
+              <h2 id="alertTitle">Pause for Paws</h2>
+              <p id="alertMessage">Tap any corridor on the map or in the table to see the message a driver would get for that stretch of road.</p>
+            </div>
+            <div class="alert-route"><span>This stretch</span><span class="route-line"></span><span id="alertSpecies">Select a corridor</span></div>
           </article>
           <article class="stats-panel panel">
-            <div class="stat"><span class="kicker">Corridors watched</span><strong>12</strong><span class="stat-note">across 3 districts</span></div>
-            <div class="stat"><span class="kicker">Signals this hour</span><strong id="signalsCount">27</strong><span class="stat-note">+8% vs. last Tuesday</span></div>
-            <div class="stat"><span class="kicker">Average confidence</span><strong id="confidenceValue">91<small>%</small></strong><span class="stat-note">sensor consensus</span></div>
+            <div class="stat"><span class="kicker" id="statCrashesLabel">Crashes</span><strong id="statCrashes">—</strong><span class="stat-note" id="statCrashesNote">animal-related, statewide</span></div>
+            <div class="stat"><span class="kicker">People hurt or killed</span><strong id="statInjury">—</strong><span class="stat-note" id="statInjuryNote">&nbsp;</span></div>
+            <div class="stat"><span class="kicker" id="statMonthLabel">Worst month</span><strong id="statMonth">—</strong><span class="stat-note" id="statMonthNote">&nbsp;</span></div>
           </article>
         </aside>
       </section>
 
       <section class="corridor-section">
-        <div class="section-heading"><div><span class="kicker">Signal register</span><h2>Active corridors</h2></div></div>
-        <div class="corridor-list" id="corridorList"></div>
+        <div class="section-heading">
+          <div><span class="kicker">When it happens</span><h2 id="monthHeading">&nbsp;</h2></div>
+          <span class="mono" id="monthCaption">crashes per month</span>
+        </div>
+        <div class="month-chart" id="monthChart" aria-label="Bar chart of animal-related crashes by month in Iowa"></div>
+        <p class="data-note" id="monthNote">&nbsp;</p>
+      </section>
+
+      <section class="corridor-section day-section" id="daily">
+        <div class="section-heading">
+          <div><span class="kicker" id="dayKicker">This month, day by day</span><h2 id="dayTitle">&nbsp;</h2></div>
+          <span class="mono" id="dayTotal">—</span>
+        </div>
+        <div class="month-picker" id="monthPicker" role="tablist" aria-label="Choose a month"></div>
+        <div class="day-chart" id="dayChart" aria-label="Bar chart of animal-related crashes for each day of the selected month"></div>
+        <p class="data-note" id="dayNote">&nbsp;</p>
+        <div class="weekday-strip" id="weekdayStrip" aria-label="Crashes by day of the week across the whole year"></div>
+        <p class="data-note" id="weekdayNote">&nbsp;</p>
+      </section>
+
+      <section class="risk-section">
+        <div class="section-heading">
+          <div><span class="kicker">Corridor register</span><h2>Where it keeps happening</h2></div>
+          <span class="mono" id="corridorCount">—</span>
+        </div>
+        <div class="risk-toolbar">
+          <label class="search-box" for="corridorSearch"><span>⌕</span><input id="corridorSearch" type="search" inputmode="numeric" placeholder="Enter a ZIP code (e.g. 50263) or corridor ID" aria-label="Search corridors by ZIP code or corridor ID"></label>
+          <button class="secondary-button" id="nearMe" title="Use my location">Near me</button>
+          <button class="secondary-button" id="viewStatewide">Statewide</button>
+          <button class="secondary-button" id="viewMetro">Des Moines area</button>
+        </div>
+        <div class="risk-list" id="corridorList"></div>
+        <p class="data-note">A corridor is a group of crashes within about 4 km of each other. Corridors with fewer than 3 crashes are not listed. Coordinates are the centre of the group, not an exact crash location. Enter an Iowa ZIP code to see the 10 corridors closest to it.</p>
+      </section>
+
+      <section class="corridor-section" id="how">
+        <div class="section-heading"><div><span class="kicker">How we built it</span><h2>Where the numbers come from</h2></div></div>
+        <div class="method-grid">
+          <div class="method">
+            <span class="kicker">1 / The data</span>
+            <p>Every animal-related crash reported to police in Iowa since January 2025, pulled directly from the Iowa Department of Transportation's public crash-data service and refreshed twice a month. The service records where, when and how bad — but <b>not which animal</b>. So we count animal crashes, not deer crashes. We did not estimate or invent any of it.</p>
+          </div>
+          <div class="method">
+            <span class="kicker">2 / Grouping</span>
+            <p>We grouped crashes that happened within about 4 km of each other into one corridor, then ranked corridors by how many crashes they contain.</p>
+          </div>
+          <div class="method">
+            <span class="kicker">3 / What changed</span>
+            <p>Our first version shaded the map by where deer live. A wildlife biologist at the Iowa DNR told us crash risk follows traffic volume, not deer density. So we rebuilt it around crash counts instead.</p>
+          </div>
+          <div class="method">
+            <span class="kicker">4 / What it can't do</span>
+            <p>It shows a pattern from the past. It cannot tell you an animal is there right now, it cannot tell you which animal, and it only contains crashes someone reported to police. Research on <em>deer</em> crashes suggests about 40% are never reported, so the real totals are higher than these. Iowa DOT adds crashes as reports come in, so the last few weeks are always incomplete.</p>
+          </div>
+        </div>
       </section>
     </main>
+
     <footer>
-      <span>Pause for Paws / field prototype</span>
-      <span>Crash data: <a href="https://public-iowadot.opendata.arcgis.com/" target="_blank" rel="noopener">Iowa Department of Transportation Open Data</a> (Crash Data / SOR). Iowa DOT does not endorse this project.</span>
-      <span>This is historical pattern analysis, not a live animal tracker. Data may be incomplete or delayed; always drive to conditions.</span>
+      <span>Pause for Paws — a student project, Waukee, Iowa</span>
+      <span>Crash data: Iowa DOT public crash records, 2025 to present. Our analysis is independent and is currently under review with Iowa DOT; it is not an official Iowa DOT product.</span>
     </footer>
   </div>
   <div class="toast" id="toast" role="status"></div>
-  <div class="approach-popup" id="approachPopup" role="alert" aria-live="assertive"><button id="closePopup" aria-label="Close alert">×</button><span class="popup-mark">+</span><span class="kicker">Approaching wildlife area</span><strong>Pause for Paws</strong><p id="popupMessage">Wildlife collision risk area ahead. Slow down and watch both shoulders.</p></div>
+  <div class="approach-popup" id="approachPopup" role="alert" aria-live="assertive"><button id="closePopup" aria-label="Close alert">&times;</button><span class="popup-mark">+</span><span class="kicker">Approaching a crash corridor</span><strong>Pause for Paws</strong><p id="popupMessage"></p></div>
   <script src="google-maps-config.js"></script>
   <script src="app.js"></script>
 </body>
