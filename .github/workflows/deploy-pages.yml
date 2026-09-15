@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "0 11 * * 1"   # every Monday 11:00 UTC (6am Central): refresh from Iowa DOT
+    - cron: "0 11 1,16 * *"   # 1st and 16th of every month, 11:00 UTC (6am Central): refresh from Iowa DOT
   workflow_dispatch:
 
 permissions:

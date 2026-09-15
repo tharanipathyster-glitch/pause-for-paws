@@ -17,7 +17,7 @@ python precompute_corridors.py            # fetch live from Iowa DOT, then build
 python precompute_corridors.py --offline  # rebuild from the cached CSVs only
 ```
 
-The raw rows are cached in `data/crashes-<year>.csv` so the site can be rebuilt without network access. The GitHub Pages workflow runs the same script on every deploy and every Monday morning, so the live site refreshes itself weekly. The current year is shown as "so far" with the date the data runs through; Iowa DOT keeps adding crashes as reports arrive, so recent weeks are always incomplete.
+The raw rows are cached in `data/crashes-<year>.csv` so the site can be rebuilt without network access. The GitHub Pages workflow runs the same script on every deploy and on the 1st and 16th of every month, so the live site refreshes itself twice a month. The current year is shown as "so far" with the date the data runs through; Iowa DOT keeps adding crashes as reports arrive, so recent weeks are always incomplete.
 
 Driver-submitted sightings live in `USER_REPORTS` inside the script. `server.py` and [waze-archive-test-data.csv](waze-archive-test-data.csv) are left over from the earlier prototype and are not used by the website.
 
