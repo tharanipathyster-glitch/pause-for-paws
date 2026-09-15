@@ -105,6 +105,7 @@
         </div>
         <div class="risk-toolbar">
           <label class="search-box" for="corridorSearch"><span>⌕</span><input id="corridorSearch" type="search" inputmode="numeric" placeholder="Enter a ZIP code (e.g. 50263) or corridor ID" aria-label="Search corridors by ZIP code or corridor ID"></label>
+          <button class="secondary-button" id="nearMe" title="Use my location">Near me</button>
           <button class="secondary-button" id="viewStatewide">Statewide</button>
           <button class="secondary-button" id="viewMetro">Des Moines area</button>
         </div>
@@ -141,6 +142,7 @@
     </footer>
   </div>
   <div class="toast" id="toast" role="status"></div>
+  <div class="approach-popup" id="approachPopup" role="alert" aria-live="assertive"><button id="closePopup" aria-label="Close alert">&times;</button><span class="popup-mark">+</span><span class="kicker">Approaching a crash corridor</span><strong>Pause for Paws</strong><p id="popupMessage"></p></div>
   <script src="google-maps-config.js"></script>
   <script src="app.js"></script>
 </body>

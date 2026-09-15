@@ -244,6 +244,17 @@ function distanceMiles(aLat, aLng, bLat, bLng) {
   return 3958.8 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
+function renderNearest(lat, lng, label) {
+  const nearest = currentCorridors()
+    .map((c) => ({ ...c, distanceMi: distanceMiles(lat, lng, c.lat, c.lng) }))
+    .sort((a, b) => a.distanceMi - b.distanceMi);
+  renderCorridorList(nearest, label);
+  if (googleMap) {
+    googleMap.panTo({ lat, lng });
+    googleMap.setZoom(10);
+  }
+}
+
 function searchByZip(zip) {
   const centre = ZIPS && ZIPS[zip];
   if (!centre) {
@@ -251,15 +262,67 @@ function searchByZip(zip) {
     $("#corridorList").innerHTML = `<p class="empty-state">${ZIPS ? `${zip} is not an Iowa ZIP code we know. Try another, or search by corridor ID.` : "One moment..."}</p>`;
     return;
   }
-  const [lat, lng] = centre;
-  const nearest = currentCorridors()
-    .map((c) => ({ ...c, distanceMi: distanceMiles(lat, lng, c.lat, c.lng) }))
-    .sort((a, b) => a.distanceMi - b.distanceMi);
-  renderCorridorList(nearest, `10 nearest to ${zip}`);
-  if (googleMap) {
-    googleMap.panTo({ lat, lng });
-    googleMap.setZoom(10);
+  renderNearest(centre[0], centre[1], `10 nearest to ${zip}`);
+}
+
+/* ---------- "Near me": phone location, nearest corridors, approach popups ---------- */
+
+const APPROACH_RADIUS_MILES = 2;
+const APPROACH_COOLDOWN_MS = 10 * 60 * 1000;
+let userMarker = null;
+let proximityWatchId = null;
+const lastApproachAt = {};
+
+function placeUserMarker(lat, lng) {
+  if (!googleMap || !window.google) return;
+  if (!userMarker) {
+    userMarker = new google.maps.Marker({ map: googleMap, title: "You are here", label: { text: "You", fontSize: "10px" } });
   }
+  userMarker.setPosition({ lat, lng });
+}
+
+function nearMe() {
+  if (!navigator.geolocation) { showToast("Location is not available on this device."); return; }
+  $("#nearMe").disabled = true;
+  navigator.geolocation.getCurrentPosition((position) => {
+    $("#nearMe").disabled = false;
+    const { latitude: lat, longitude: lng } = position.coords;
+    $("#corridorSearch").value = "";
+    placeUserMarker(lat, lng);
+    renderNearest(lat, lng, "10 nearest to you");
+    startProximityWatch();
+  }, () => {
+    $("#nearMe").disabled = false;
+    showToast("Could not get your location. Check location permission and try again.");
+  }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+}
+
+function showApproachPopup(corridor) {
+  $("#popupMessage").textContent =
+    `${corridor.crashes} animal-related crashes on this stretch in ${periodLabel()}` +
+    (corridor.compare && corridor.compare.crashes ? `, ${corridor.compare.crashes} in ${corridor.compare.year}` : "") +
+    `. Slow down and watch both shoulders.`;
+  const popup = $("#approachPopup");
+  popup.classList.add("visible");
+  window.setTimeout(() => popup.classList.remove("visible"), 8000);
+}
+
+/* Watches the phone's position and pops a warning when it comes within 2 miles of a busy corridor. */
+function startProximityWatch() {
+  if (proximityWatchId != null || !navigator.geolocation) return;
+  proximityWatchId = navigator.geolocation.watchPosition((position) => {
+    const { latitude, longitude } = position.coords;
+    placeUserMarker(latitude, longitude);
+    const zones = (DATA && DATA.corridors ? DATA.corridors : []).filter((c) => c.crashes >= 5);
+    for (const corridor of zones) {
+      if (distanceMiles(latitude, longitude, corridor.lat, corridor.lng) > APPROACH_RADIUS_MILES) continue;
+      const now = Date.now();
+      if (lastApproachAt[corridor.id] && now - lastApproachAt[corridor.id] < APPROACH_COOLDOWN_MS) continue;
+      lastApproachAt[corridor.id] = now;
+      selectCorridor(corridor, false);
+      showApproachPopup(corridor);
+    }
+  }, () => undefined, { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 });
 }
 
 function runSearch(raw) {
@@ -413,6 +476,14 @@ function setView(next) {
 $("#viewStatewide").addEventListener("click", () => setView("statewide"));
 $("#viewMetro").addEventListener("click", () => setView("metro"));
 $("#corridorSearch").addEventListener("input", (event) => runSearch(event.target.value));
+$("#nearMe").addEventListener("click", nearMe);
+$("#closePopup").addEventListener("click", () => $("#approachPopup").classList.remove("visible"));
+
+/* Inside the phone app: start the native background alert service and use location straight away. */
+const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+if (isNativeApp && window.Capacitor.Plugins && window.Capacitor.Plugins.CorridorAlert) {
+  window.Capacitor.Plugins.CorridorAlert.start().catch(() => undefined);
+}
 
 fetch("iowa-zips.json")
   .then((response) => (response.ok ? response.json() : null))
@@ -428,6 +499,7 @@ fetch("corridors.json")
     ALL = data;
     setYear(data.defaultYear);
     loadGoogleMap();
+    if (isNativeApp) nearMe();
   })
   .catch(() => {
     mapUnavailable("Corridor data did not load.");
