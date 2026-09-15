@@ -10,15 +10,16 @@ Crash data referenced by this project comes from the [Iowa Department of Transpo
 
 The website is fully static. Serve the folder with any web server, for example `python -m http.server 5500`, then open `http://localhost:5500/index.html`.
 
-All the numbers on the page come from [corridors.json](corridors.json), which is generated from the Iowa DOT export [2025 - IA Data.csv](2025%20-%20IA%20Data.csv) by:
+All the numbers on the page come from [corridors.json](corridors.json), which [precompute_corridors.py](precompute_corridors.py) builds by pulling every animal-related crash for this year and last year straight from the Iowa DOT Crash Data feature service (`Traffic_Safety/Crash_Data`, crashes whose major cause is Animal):
 
 ```
-python precompute_corridors.py
+python precompute_corridors.py            # fetch live from Iowa DOT, then build
+python precompute_corridors.py --offline  # rebuild from the cached CSVs only
 ```
 
-Re-run that whenever the CSV changes (or a driver report is added to `USER_REPORTS` inside the script), then commit the regenerated `corridors.json`. The script produces the statewide and Des Moines-area corridor clusters, crashes per month, crashes per day for every month, crashes by day of the week, and the injury/fatality totals. Nothing on the page is typed in by hand.
+The raw rows are cached in `data/crashes-<year>.csv` so the site can be rebuilt without network access. The GitHub Pages workflow runs the same script on every deploy and every Monday morning, so the live site refreshes itself weekly. The current year is shown as "so far" with the date the data runs through; Iowa DOT keeps adding crashes as reports arrive, so recent weeks are always incomplete.
 
-`server.py` and [waze-archive-test-data.csv](waze-archive-test-data.csv) are left over from the earlier prototype and are not used by the website.
+Driver-submitted sightings live in `USER_REPORTS` inside the script. `server.py` and [waze-archive-test-data.csv](waze-archive-test-data.csv) are left over from the earlier prototype and are not used by the website.
 
 ## Legal and product framing
 

@@ -1,14 +1,17 @@
 /* Pause for Paws — static front end.
-   Reads corridors.json (precomputed from Iowa DOT 2025 crash records).
-   No backend required: this page works on any static host. */
+   Reads corridors.json, which precompute_corridors.py builds from the Iowa DOT
+   Crash Data service (this year so far + last year). No backend required. */
 
-let DATA = null;
+let ALL = null;       // whole corridors.json
+let DATA = null;      // ALL.years[year] currently shown
+let year = null;
 let view = "statewide";
 let selectedMonth = new Date().getMonth(); // 0-11, defaults to the current calendar month
 let googleMap = null;
 let mapShapes = [];
 
 const $ = (sel) => document.querySelector(sel);
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 function showToast(message) {
   const toast = $("#toast");
@@ -22,6 +25,26 @@ function currentCorridors() {
   return view === "metro" ? DATA.desMoines.corridors : DATA.corridors;
 }
 
+function formatDate(mmdd) {
+  const [m, d] = mmdd.split("-");
+  return `${MONTHS[Number(m) - 1]} ${Number(d)}`;
+}
+
+function formatIsoDate(iso) {
+  const [y, m, d] = String(iso).split("-").map(Number);
+  return y && m && d ? `${MONTHS[m - 1].slice(0, 3)} ${d}, ${y}` : iso;
+}
+
+/* "2026 so far" / "2025" — used wherever the page names the period. */
+function periodLabel() {
+  return DATA.partial ? `${DATA.year} so far` : String(DATA.year);
+}
+
+/* Last month that has any data: for a partial year, the month of the latest crash. */
+function lastDataMonth() {
+  return DATA.partial && DATA.through ? Number(DATA.through.split("-")[1]) - 1 : 11;
+}
+
 /* ---------- header date (today, refreshed at midnight) ---------- */
 
 function renderTodayStamp() {
@@ -33,62 +56,95 @@ function renderTodayStamp() {
 }
 renderTodayStamp();
 
+/* ---------- year switch ---------- */
+
+function renderYearSwitch() {
+  const years = Object.keys(ALL.years).map(Number).sort((a, b) => b - a);
+  $("#yearSwitch").innerHTML = years.map((y) => {
+    const d = ALL.years[y];
+    return `<button class="year-pill${y === year ? " active" : ""}" data-year="${y}" aria-pressed="${y === year}">
+      ${y}${d.partial ? " so far" : ""}</button>`;
+  }).join("");
+  $("#yearSwitch").querySelectorAll(".year-pill").forEach((button) => {
+    button.addEventListener("click", () => setYear(Number(button.dataset.year)));
+  });
+}
+
+function setYear(next) {
+  year = next;
+  DATA = ALL.years[year];
+  if (selectedMonth > lastDataMonth()) selectedMonth = lastDataMonth();
+  renderYearSwitch();
+  renderStats();
+  renderMonthChart();
+  renderMonthPicker();
+  renderDayChart();
+  renderWeekdayStrip();
+  document.querySelectorAll(".period-label").forEach((el) => { el.textContent = periodLabel(); });
+  setView(view);
+}
+
 /* ---------- header numbers ---------- */
 
 function renderStats() {
-  $("#dataStamp").textContent = `Iowa DOT crash records ${DATA.year}`;
-  $("#statCrashesLabel").textContent = `Crashes in ${DATA.year}`;
+  $("#dataStamp").textContent = `Iowa DOT crash records, ${periodLabel()}`;
+  $("#mapKicker").textContent = `Iowa DOT crash records / ${periodLabel()}`;
+  $("#statCrashesLabel").textContent = `Crashes in ${periodLabel()}`;
   $("#statCrashes").textContent = DATA.totalCrashes.toLocaleString();
+  $("#statCrashesNote").textContent = DATA.partial && DATA.through
+    ? `animal-related, statewide, through ${formatIsoDate(DATA.through)}`
+    : "animal-related, statewide";
   $("#statInjury").textContent = DATA.injuryOrWorse.toLocaleString();
-  $("#statInjuryNote").textContent = DATA.fatal ? `includes ${DATA.fatal} deaths` : "injury or fatal crashes";
+  $("#statInjuryNote").textContent = DATA.fatal
+    ? `includes ${DATA.fatal} death${DATA.fatal === 1 ? "" : "s"}`
+    : (DATA.partial ? "no deaths recorded so far" : "no deaths recorded");
 
   const peak = DATA.monthly.reduce((best, m) => (m.crashes > best.crashes ? m : best));
   const yearTotal = DATA.monthly.reduce((sum, m) => sum + m.crashes, 0);
+  $("#statMonthLabel").textContent = DATA.partial ? "Worst month so far" : "Worst month";
   $("#statMonth").textContent = peak.month;
   $("#statMonthNote").textContent =
-    `${peak.crashes.toLocaleString()} crashes — ${Math.round((peak.crashes / yearTotal) * 100)}% of the year`;
+    `${peak.crashes.toLocaleString()} crashes, ${Math.round((peak.crashes / yearTotal) * 100)}% of ${periodLabel()}`;
 }
 
 /* ---------- month chart ---------- */
 
 function renderMonthChart() {
+  const last = lastDataMonth();
   const peak = Math.max(...DATA.monthly.map((m) => m.crashes));
-  $("#monthChart").innerHTML = DATA.monthly.map((m) => {
+  const peakName = MONTHS[DATA.monthly.findIndex((m) => m.crashes === peak)];
+
+  $("#monthHeading").textContent = DATA.partial ? `${peakName} leads so far.` : `${peakName} is not close.`;
+  $("#monthCaption").textContent = `crashes per month, ${periodLabel()}`;
+
+  $("#monthChart").innerHTML = DATA.monthly.map((m, i) => {
     const pct = Math.round((m.crashes / peak) * 100);
-    const hot = m.crashes === peak ? " peak" : "";
-    return `<div class="month-col${hot}">
-      <span class="month-value">${m.crashes.toLocaleString()}</span>
-      <div class="bar-wrap"><div class="month-bar" style="height:${Math.max(pct, 3)}%"></div></div>
+    const cls = (m.crashes === peak ? " peak" : "") + (i === last && DATA.partial ? " partial" : "") + (i > last ? " future" : "");
+    return `<div class="month-col${cls}" title="${MONTHS[i]}: ${m.crashes} crashes${i === last && DATA.partial ? " (month in progress)" : ""}">
+      <span class="month-value">${i > last ? "" : m.crashes.toLocaleString()}</span>
+      <div class="bar-wrap"><div class="month-bar" style="height:${i > last ? 0 : Math.max(pct, 3)}%"></div></div>
       <span class="month-label">${m.month}</span>
     </div>`;
   }).join("");
 
   const worst = DATA.topDates[0];
-  const novDates = DATA.topDates.filter((d) => d.date.startsWith("11")).length;
+  const peakMM = String(DATA.monthly.findIndex((m) => m.crashes === peak) + 1).padStart(2, "0");
+  const inPeak = DATA.topDates.filter((d) => d.date.startsWith(peakMM)).length;
   $("#monthNote").textContent =
-    `${novDates} of the 10 worst individual days in 2025 were in November. The worst single day was ` +
-    `${formatDate(worst.date)}, with ${worst.crashes} crashes in 24 hours.`;
-}
-
-const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-
-function formatDate(mmdd) {
-  const [m, d] = mmdd.split("-");
-  return `${MONTHS[Number(m) - 1]} ${Number(d)}`;
-}
-
-function formatIsoDate(iso) {
-  const [y, m, d] = String(iso).split("-").map(Number);
-  return y && m && d ? `${d} ${MONTHS[m - 1].slice(0, 3)} ${y}` : iso;
+    `${inPeak} of the 10 worst individual days in ${periodLabel()} were in ${peakName}. The worst single day was ` +
+    `${formatDate(worst.date)}, with ${worst.crashes} crashes in 24 hours.` +
+    (DATA.partial && DATA.through ? ` ${MONTHS[last]} is still in progress: data runs through ${formatIsoDate(DATA.through)}.` : "");
 }
 
 /* ---------- day-by-day chart for one month ---------- */
 
 function renderMonthPicker() {
+  const last = lastDataMonth();
   $("#monthPicker").innerHTML = DATA.monthly.map((m, i) =>
-    `<button class="month-pill${i === selectedMonth ? " active" : ""}" data-month="${i}" role="tab" aria-selected="${i === selectedMonth}">${m.month}</button>`
+    `<button class="month-pill${i === selectedMonth ? " active" : ""}" data-month="${i}" role="tab"
+      aria-selected="${i === selectedMonth}" ${i > last ? "disabled" : ""}>${m.month}</button>`
   ).join("");
-  $("#monthPicker").querySelectorAll(".month-pill").forEach((button) => {
+  $("#monthPicker").querySelectorAll(".month-pill:not([disabled])").forEach((button) => {
     button.addEventListener("click", () => {
       selectedMonth = Number(button.dataset.month);
       renderMonthPicker();
@@ -98,20 +154,27 @@ function renderMonthPicker() {
 }
 
 function renderDayChart() {
-  const days = DATA.daily[selectedMonth] || [];
+  const now = new Date();
+  const isCurrentMonth = selectedMonth === now.getMonth() && year === now.getFullYear();
+  const inProgress = DATA.partial && selectedMonth === lastDataMonth() && DATA.through;
+  const throughDay = inProgress ? Number(DATA.through.split("-")[2]) : null;
+  const allDays = DATA.daily[selectedMonth] || [];
+  const days = throughDay ? allDays.slice(0, throughDay) : allDays;   // ignore days that have not happened yet
   const total = days.reduce((sum, n) => sum + n, 0);
   const peak = Math.max(...days, 1);
-  const isCurrentMonth = selectedMonth === new Date().getMonth();
 
-  $("#dayTitle").textContent = `${MONTHS[selectedMonth]} ${DATA.year}${isCurrentMonth ? " (this month, last year)" : ""}`;
-  $("#dayTotal").textContent = `${total.toLocaleString()} crashes / ${(total / days.length).toFixed(1)} per day`;
+  $("#dayKicker").textContent = isCurrentMonth ? "This month, day by day" : "One month, day by day";
+  $("#dayTitle").textContent = `${MONTHS[selectedMonth]} ${year}` +
+    (isCurrentMonth ? "" : (selectedMonth === now.getMonth() ? " (this month, last year)" : ""));
+  $("#dayTotal").textContent = `${total.toLocaleString()} crashes / ${(total / Math.max(days.length, 1)).toFixed(1)} per day`;
 
-  $("#dayChart").innerHTML = days.map((n, i) => {
+  $("#dayChart").innerHTML = allDays.map((n, i) => {
+    const future = throughDay && i >= throughDay;
     const pct = Math.round((n / peak) * 100);
-    const hot = n === peak ? " peak" : "";
-    return `<div class="day-col${hot}" title="${MONTHS[selectedMonth]} ${i + 1}: ${n} crashes">
-      <span class="day-value">${n}</span>
-      <div class="bar-wrap"><div class="day-bar" style="height:${Math.max(pct, 2)}%"></div></div>
+    const cls = (n === peak && !future ? " peak" : "") + (future ? " future" : "");
+    return `<div class="day-col${cls}" title="${MONTHS[selectedMonth]} ${i + 1}: ${future ? "no data yet" : `${n} crashes`}">
+      <span class="day-value">${future ? "" : n}</span>
+      <div class="bar-wrap"><div class="day-bar" style="height:${future ? 0 : Math.max(pct, 2)}%"></div></div>
       <span class="day-label">${i + 1}</span>
     </div>`;
   }).join("");
@@ -120,7 +183,9 @@ function renderDayChart() {
   const quietDays = days.filter((n) => n === 0).length;
   const share = Math.round((total / DATA.totalCrashes) * 100);
   $("#dayNote").textContent =
-    `${MONTHS[selectedMonth]} had ${total.toLocaleString()} animal-related crashes, ${share}% of the year. ` +
+    (inProgress
+      ? `${MONTHS[selectedMonth]} has had ${total.toLocaleString()} animal-related crashes so far (data through ${formatIsoDate(DATA.through)}). `
+      : `${MONTHS[selectedMonth]} had ${total.toLocaleString()} animal-related crashes, ${share}% of ${periodLabel()}. `) +
     `The worst day was ${MONTHS[selectedMonth]} ${worstDay} with ${peak}. ` +
     (quietDays ? `${quietDays} day${quietDays === 1 ? "" : "s"} had none.` : `Every single day had at least one.`);
 }
@@ -136,7 +201,7 @@ function renderWeekdayStrip() {
   const worst = DATA.weekday.find((d) => d.crashes === peak);
   const best = DATA.weekday.reduce((a, b) => (b.crashes < a.crashes ? b : a));
   $("#weekdayNote").textContent =
-    `Across the whole year, ${worst.day} is the worst day of the week (${worst.crashes.toLocaleString()} crashes) and ${best.day} the quietest (${best.crashes.toLocaleString()}).`;
+    `Across ${periodLabel()}, ${worst.day} is the worst day of the week (${worst.crashes.toLocaleString()} crashes) and ${best.day} the quietest (${best.crashes.toLocaleString()}).`;
 }
 
 /* ---------- corridor table ---------- */
@@ -151,7 +216,7 @@ function renderCorridorList(list, label) {
       <div class="risk-rank">${i + 1}</div>
       <div><strong>${c.id}</strong><span>${c.distanceMi != null ? `${c.distanceMi.toFixed(1)} mi away / ` : ""}${c.lat.toFixed(3)}, ${c.lng.toFixed(3)}</span></div>
       <div class="risk-animals">${c.risk}</div>
-      <div class="risk-score"><b>${c.crashes}</b><span>crashes in 2025</span></div>
+      <div class="risk-score"><b>${c.crashes}</b><span>crashes in ${periodLabel()}</span></div>
       <button class="simulate-button" data-id="${c.id}">Show driver message <span>→</span></button>
     </article>`).join("") : `<p class="empty-state">No corridors match that search.</p>`;
 
@@ -207,10 +272,10 @@ function runSearch(raw) {
 function selectCorridor(corridor, pan) {
   $("#alertTitle").textContent = "Pause for Paws";
   $("#alertMessage").textContent =
-    `${corridor.crashes} animal-related crashes were recorded on this stretch of road in 2025` +
+    `${corridor.crashes} animal-related crashes were recorded on this stretch of road in ${periodLabel()}` +
     (corridor.injuryOrWorse ? `, and ${corridor.injuryOrWorse} of them hurt someone` : "") +
     `. Slow down and watch both shoulders. This is a historical pattern, not a live animal location.`;
-  $("#alertSpecies").textContent = `${corridor.id} · ${corridor.risk}`;
+  $("#alertSpecies").textContent = `${corridor.id} / ${corridor.risk}`;
   if (pan && googleMap) {
     googleMap.panTo({ lat: corridor.lat, lng: corridor.lng });
     googleMap.setZoom(12);
@@ -270,7 +335,7 @@ function drawCorridors() {
     bounds.extend({ lat: corridor.lat, lng: corridor.lng });
   });
 
-  (DATA.reports || []).forEach((report) => {
+  (ALL.reports || []).forEach((report) => {
     const marker = new google.maps.Marker({
       map: googleMap,
       position: { lat: report.lat, lng: report.lng },
@@ -303,7 +368,7 @@ function renderMapMeta() {
 
 function setView(next) {
   view = next;
-  $("#mapTitle").textContent = next === "metro" ? "Des Moines area" : "Iowa — statewide";
+  $("#mapTitle").textContent = next === "metro" ? "Des Moines area" : "Iowa, statewide";
   $("#viewStatewide").classList.toggle("active", next === "statewide");
   $("#viewMetro").classList.toggle("active", next === "metro");
   $("#corridorSearch").value = "";
@@ -329,13 +394,8 @@ fetch("corridors.json")
     return response.json();
   })
   .then((data) => {
-    DATA = data;
-    renderStats();
-    renderMonthChart();
-    renderMonthPicker();
-    renderDayChart();
-    renderWeekdayStrip();
-    setView("statewide");
+    ALL = data;
+    setYear(data.defaultYear);
     loadGoogleMap();
   })
   .catch(() => {

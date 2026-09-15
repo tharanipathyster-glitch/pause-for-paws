@@ -3,6 +3,8 @@ name: Deploy map to GitHub Pages
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: "0 11 * * 1"   # every Monday 11:00 UTC (6am Central): refresh from Iowa DOT
   workflow_dispatch:
 
 permissions:
@@ -23,6 +25,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Refresh crash data from Iowa DOT
+        # Pulls this year + last year from the live feature service; falls back to
+        # the cached data/crashes-*.csv in the repo if the service is unreachable.
+        run: python precompute_corridors.py
 
       - name: Assemble static site
         env:

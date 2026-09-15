@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#13231e">
   <title>Pause for Paws | Iowa animal-crash corridors</title>
-  <meta name="description" content="A map of the stretches of Iowa road where vehicle-animal crashes keep happening, built from Iowa DOT crash records by a Waukee student robotics team.">
+  <meta name="description" content="A map of the stretches of Iowa road where vehicle-animal crashes keep happening, built from live Iowa DOT crash records by a Waukee student robotics team.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -30,22 +30,24 @@
         <div>
           <p class="eyebrow">Iowa / vehicle–animal crash corridors</p>
           <h1>Slow down.<br><em>This is where it keeps happening.</em></h1>
-          <p class="hero-copy">We are a student robotics team in Waukee, Iowa. We took the state's own crash records and grouped them into the stretches of road where drivers keep hitting animals — so you can check your route before you drive it.</p>
+          <p class="hero-copy">We are a student robotics team in Waukee, Iowa. We take the state's own crash records, updated every week, and group them into the stretches of road where drivers keep hitting animals — so you can check your route before you drive it.</p>
         </div>
         <div class="hero-meta">
           <span class="meta-label">What this is</span>
-          <strong>A pattern from the past</strong>
-          <span>Not a live animal tracker. We cannot tell you an animal is in the road right now.</span>
+          <strong>A pattern, not a tracker</strong>
+          <span>Built from crashes already reported to Iowa DOT. We cannot tell you an animal is in the road right now.</span>
         </div>
       </section>
+
+      <div class="year-switch" id="yearSwitch" aria-label="Choose a year"></div>
 
       <section class="dashboard-grid" aria-label="Iowa crash corridor map">
         <div class="map-panel panel">
           <div class="panel-heading">
-            <div><span class="kicker">Iowa DOT crash records / 2025</span><h2 id="mapTitle">Iowa — statewide</h2></div>
+            <div><span class="kicker" id="mapKicker">Iowa DOT crash records</span><h2 id="mapTitle">Iowa, statewide</h2></div>
             <span class="map-badge"><span class="status-dot"></span> <span id="mapBadge">Loading…</span></span>
           </div>
-          <div class="map-canvas" id="mapCanvas" aria-label="Map of Iowa showing where vehicle-animal crashes were recorded in 2025">
+          <div class="map-canvas" id="mapCanvas" aria-label="Map of Iowa showing where vehicle-animal crashes were recorded">
             <div class="map-fallback" id="mapFallback">
               <strong>Map loading…</strong>
               <span>If it does not appear, the corridor table below shows the same data.</span>
@@ -68,25 +70,25 @@
             <div class="alert-route"><span>This stretch</span><span class="route-line"></span><span id="alertSpecies">Select a corridor</span></div>
           </article>
           <article class="stats-panel panel">
-            <div class="stat"><span class="kicker" id="statCrashesLabel">Crashes in 2025</span><strong id="statCrashes">—</strong><span class="stat-note">animal-related, statewide</span></div>
+            <div class="stat"><span class="kicker" id="statCrashesLabel">Crashes</span><strong id="statCrashes">—</strong><span class="stat-note" id="statCrashesNote">animal-related, statewide</span></div>
             <div class="stat"><span class="kicker">People hurt or killed</span><strong id="statInjury">—</strong><span class="stat-note" id="statInjuryNote">&nbsp;</span></div>
-            <div class="stat"><span class="kicker">Worst month</span><strong id="statMonth">—</strong><span class="stat-note" id="statMonthNote">&nbsp;</span></div>
+            <div class="stat"><span class="kicker" id="statMonthLabel">Worst month</span><strong id="statMonth">—</strong><span class="stat-note" id="statMonthNote">&nbsp;</span></div>
           </article>
         </aside>
       </section>
 
       <section class="corridor-section">
         <div class="section-heading">
-          <div><span class="kicker">When it happens</span><h2>November is not close.</h2></div>
-          <span class="mono">crashes per month, 2025</span>
+          <div><span class="kicker">When it happens</span><h2 id="monthHeading">&nbsp;</h2></div>
+          <span class="mono" id="monthCaption">crashes per month</span>
         </div>
-        <div class="month-chart" id="monthChart" aria-label="Bar chart of animal-related crashes by month in Iowa in 2025"></div>
+        <div class="month-chart" id="monthChart" aria-label="Bar chart of animal-related crashes by month in Iowa"></div>
         <p class="data-note" id="monthNote">&nbsp;</p>
       </section>
 
       <section class="corridor-section day-section" id="daily">
         <div class="section-heading">
-          <div><span class="kicker">This month, day by day</span><h2 id="dayTitle">September</h2></div>
+          <div><span class="kicker" id="dayKicker">This month, day by day</span><h2 id="dayTitle">&nbsp;</h2></div>
           <span class="mono" id="dayTotal">—</span>
         </div>
         <div class="month-picker" id="monthPicker" role="tablist" aria-label="Choose a month"></div>
@@ -115,7 +117,7 @@
         <div class="method-grid">
           <div class="method">
             <span class="kicker">1 / The data</span>
-            <p>Every animal-related crash reported to police in Iowa in 2025, from the Iowa Department of Transportation's public crash records. We did not estimate or invent any of it.</p>
+            <p>Every animal-related crash reported to police in Iowa since January 2025, pulled directly from the Iowa Department of Transportation's public crash-data service and refreshed every week. The service records where, when and how bad — but <b>not which animal</b>. So we count animal crashes, not deer crashes. We did not estimate or invent any of it.</p>
           </div>
           <div class="method">
             <span class="kicker">2 / Grouping</span>
@@ -127,7 +129,7 @@
           </div>
           <div class="method">
             <span class="kicker">4 / What it can't do</span>
-            <p>It shows a pattern from the past. It cannot tell you an animal is there right now, and it only contains crashes that got reported — which is roughly 6 out of every 10.</p>
+            <p>It shows a pattern from the past. It cannot tell you an animal is there right now, it cannot tell you which animal, and it only contains crashes someone reported to police. Research on <em>deer</em> crashes suggests about 40% are never reported, so the real totals are higher than these. Iowa DOT adds crashes as reports come in, so the last few weeks are always incomplete.</p>
           </div>
         </div>
       </section>
@@ -135,7 +137,7 @@
 
     <footer>
       <span>Pause for Paws — a student project, Waukee, Iowa</span>
-      <span>Crash data: Iowa DOT public crash records, 2025. Our analysis is independent and is currently under review with Iowa DOT; it is not an official Iowa DOT product.</span>
+      <span>Crash data: Iowa DOT public crash records, 2025 to present. Our analysis is independent and is currently under review with Iowa DOT; it is not an official Iowa DOT product.</span>
     </footer>
   </div>
   <div class="toast" id="toast" role="status"></div>
