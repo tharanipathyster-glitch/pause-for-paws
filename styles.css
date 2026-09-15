@@ -46,7 +46,7 @@ h2 { font-size: 21px; letter-spacing: -1px; margin: 7px 0 0; font-weight: 600; }
 .map-canvas { height: 490px; position: relative; overflow: hidden; background-color: #dce5d9; background-image: linear-gradient(25deg, transparent 48%, rgba(255,255,255,.4) 49%, transparent 51%), linear-gradient(-35deg, transparent 48%, rgba(255,255,255,.25) 49%, transparent 51%); background-size: 118px 93px, 160px 121px; }
 .map-canvas.google-map-ready { background: #dce5d9; }
 .google-map-ready > div:not(:has(.gm-style)) { display: none; }
-.map-canvas::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 55% 40%, transparent 0 26%, rgba(36,92,67,.08) 26.2% 26.6%, transparent 26.8%); pointer-events: none; }
+.map-canvas:not(.google-map-ready)::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 55% 40%, transparent 0 26%, rgba(36,92,67,.08) 26.2% 26.6%, transparent 26.8%); pointer-events: none; }
 .road { position: absolute; height: 5px; background: rgba(249,247,235,.9); border-top: 1px solid rgba(104,116,109,.3); border-bottom: 1px solid rgba(104,116,109,.3); transform-origin: left; }
 .road-one { width: 85%; left: 3%; top: 66%; transform: rotate(-29deg); }.road-two { width: 73%; left: 28%; top: 17%; transform: rotate(52deg); }.road-three { width: 58%; left: 6%; top: 30%; transform: rotate(12deg); }
 .water { position: absolute; width: 30%; height: 150%; top: -25%; left: 19%; background: rgba(184,213,219,.57); transform: rotate(24deg); border-left: 9px solid rgba(255,255,255,.25); border-right: 4px solid rgba(255,255,255,.18); }
@@ -86,9 +86,7 @@ footer { color: var(--muted); display: flex; justify-content: space-between; pad
 .bar-wrap { flex: 1; min-height: 0; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
 .month-bar { width: 100%; max-width: 54px; background: var(--green); opacity: .3;
   transition: opacity .2s ease; }
-.month-col.peak .month-bar { background: var(--coral); opacity: 1; }
-.month-col:hover .month-bar { opacity: .6; }
-.month-col.peak:hover .month-bar { opacity: 1; }
+.month-col:hover .month-bar.secondary { opacity: .5; }
 .month-value { font: 11px var(--mono); color: var(--muted); }
 .month-col.peak .month-value { color: var(--coral); font-weight: 500; }
 .month-label { font: 10px var(--mono); text-transform: uppercase; color: var(--muted); letter-spacing: .06em; }
@@ -133,8 +131,7 @@ a.primary-button { text-decoration: none; }
 .day-chart { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; align-items: end; height: 220px; padding: 12px 0 0; border-bottom: 1px solid var(--line); }
 .day-col { display: flex; flex-direction: column; align-items: center; height: 100%; gap: 4px; min-width: 0; }
 .day-bar { width: 100%; background: var(--green); opacity: .3; transition: opacity .15s; }
-.day-col.peak .day-bar { background: var(--coral); opacity: 1; }
-.day-col:hover .day-bar { opacity: .65; }
+.day-col:hover .day-bar.secondary { opacity: .5; }
 .day-value { font: 9px var(--mono); color: var(--muted); }
 .day-col.peak .day-value { color: var(--coral); font-weight: 500; }
 .day-label { font: 9px var(--mono); color: var(--muted); }
@@ -158,8 +155,28 @@ a.primary-button { text-decoration: none; }
 .year-pill { background: var(--panel); color: var(--green); border: 1px solid var(--line); padding: 9px 16px; font: 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; cursor: pointer; }
 .year-pill:hover { border-color: var(--green); }
 .year-pill.active { background: var(--green); border-color: var(--green); color: white; }
-.month-col.partial .month-bar, .day-col.partial .day-bar { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 4px, transparent 4px 8px); }
+.month-bar.partial, .day-bar.partial { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 4px, transparent 4px 8px); }
 .month-col.future .month-label, .day-col.future .day-label { opacity: .4; }
 .month-pill[disabled] { opacity: .35; cursor: default; }
 
 .risk-trend { display: block; color: var(--muted); font: 10px var(--mono); margin-top: 3px; }
+
+/* side-by-side year comparison in the bar charts */
+.chart-legend { display: flex; gap: 16px; margin: 14px 0 4px; font: 10px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.legend-item b { display: inline-block; width: 10px; height: 10px; background: var(--green); opacity: .3; margin-right: 6px; vertical-align: -1px; }
+.legend-item.primary b { opacity: 1; }
+.legend-item.primary { color: var(--ink); }
+.bar-wrap { gap: 2px; }
+.month-bar, .day-bar { flex: 1; min-width: 0; }
+.month-bar.secondary, .day-bar.secondary { opacity: .3; }
+.month-bar.primary, .day-bar.primary { opacity: 1; }
+.month-bar.peak, .day-bar.peak { background: var(--coral); }
+.month-bar.none, .day-bar.none { opacity: 0; }
+.month-value i, .day-value i { font-style: normal; display: block; }
+.month-value i.secondary { color: var(--muted); opacity: .7; }
+.month-value i.primary { color: var(--ink); }
+.month-col.peak .month-value i.primary { color: var(--coral); font-weight: 500; }
+.month-pill.ahead { color: var(--muted); }
+.month-bar { max-width: none; }
+/* phone app: keep the header clear of the status bar */
+body.native .topbar { padding-top: 40px; }

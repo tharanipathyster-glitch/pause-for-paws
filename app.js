@@ -40,6 +40,30 @@ function periodLabel() {
   return DATA.partial ? `${DATA.year} so far` : String(DATA.year);
 }
 
+/* The comparison year: the other year in the file (2025 when showing 2026, and vice versa). */
+function otherYearData() {
+  const other = Object.keys(ALL.years).map(Number).find((y) => y !== year);
+  return other ? ALL.years[other] : null;
+}
+
+/* Two series for the charts, oldest first: [{label, data, primary}] */
+function chartSeries(pick) {
+  const list = [DATA, otherYearData()].filter(Boolean)
+    .sort((a, b) => a.year - b.year)
+    .map((d) => ({ year: d.year, partial: d.partial, through: d.through, primary: d === DATA, data: pick(d) }));
+  return list;
+}
+
+function legendHtml(series) {
+  return series.map((s) => `<span class="legend-item${s.primary ? " primary" : ""}"><b></b>${s.year}${s.partial ? " so far" : ""}</span>`).join("");
+}
+
+function pctChange(now, before) {
+  if (!before) return "";
+  const change = Math.round(((now - before) / before) * 100);
+  return Math.abs(change) < 3 ? "about the same" : change > 0 ? `up ${change}%` : `down ${Math.abs(change)}%`;
+}
+
 /* Last month that has any data: for a partial year, the month of the latest crash. */
 function lastDataMonth() {
   return DATA.partial && DATA.through ? Number(DATA.through.split("-")[1]) - 1 : 11;
@@ -111,29 +135,58 @@ function renderStats() {
 
 function renderMonthChart() {
   const last = lastDataMonth();
-  const peak = Math.max(...DATA.monthly.map((m) => m.crashes));
-  const peakName = MONTHS[DATA.monthly.findIndex((m) => m.crashes === peak)];
+  const series = chartSeries((d) => d.monthly.map((m) => m.crashes));
+  const peakAll = Math.max(...series.flatMap((s) => s.data), 1);
+  const primaryPeak = Math.max(...DATA.monthly.map((m) => m.crashes));
+  const peakIdx = DATA.monthly.findIndex((m) => m.crashes === primaryPeak);
+  const peakName = MONTHS[peakIdx];
+  const other = otherYearData();
 
   $("#monthHeading").textContent = DATA.partial ? `${peakName} leads so far.` : `${peakName} is not close.`;
-  $("#monthCaption").textContent = `crashes per month, ${periodLabel()}`;
+  $("#monthCaption").textContent = `crashes per month, ${series.map((s) => s.year).join(" vs ")}`;
+  $("#monthLegend").innerHTML = legendHtml(series);
 
-  $("#monthChart").innerHTML = DATA.monthly.map((m, i) => {
-    const pct = Math.round((m.crashes / peak) * 100);
-    const cls = (m.crashes === peak ? " peak" : "") + (i === last && DATA.partial ? " partial" : "") + (i > last ? " future" : "");
-    return `<div class="month-col${cls}" title="${MONTHS[i]}: ${m.crashes} crashes${i === last && DATA.partial ? " (month in progress)" : ""}">
-      <span class="month-value">${i > last ? "" : m.crashes.toLocaleString()}</span>
-      <div class="bar-wrap"><div class="month-bar" style="height:${i > last ? 0 : Math.max(pct, 3)}%"></div></div>
-      <span class="month-label">${m.month}</span>
+  $("#monthChart").innerHTML = MONTHS.map((name, i) => {
+    const bars = series.map((s) => {
+      const n = s.data[i];
+      const noData = s.partial && i > (s.through ? Number(s.through.split("-")[1]) - 1 : 11);
+      const inProgress = s.partial && s.through && i === Number(s.through.split("-")[1]) - 1;
+      const cls = (s.primary ? " primary" : " secondary") + (s.primary && i === peakIdx ? " peak" : "") + (inProgress ? " partial" : "") + (noData ? " none" : "");
+      return `<div class="month-bar${cls}" style="height:${noData ? 0 : Math.max(Math.round((n / peakAll) * 100), 2)}%"></div>`;
+    });
+    const values = series.map((s) => {
+      const noData = s.partial && i > (s.through ? Number(s.through.split("-")[1]) - 1 : 11);
+      return `<i class="${s.primary ? "primary" : "secondary"}">${noData ? "\u2013" : s.data[i].toLocaleString()}</i>`;
+    });
+    const tip = series.map((s) => `${s.year}: ${s.data[i]}`).join(" / ");
+    const future = DATA.partial && i > last;
+    return `<div class="month-col${i === peakIdx ? " peak" : ""}${future ? " future" : ""}" title="${name}. ${tip}">
+      <span class="month-value">${values.join("")}</span>
+      <div class="bar-wrap">${bars.join("")}</div>
+      <span class="month-label">${name.slice(0, 3)}</span>
     </div>`;
   }).join("");
 
   const worst = DATA.topDates[0];
-  const peakMM = String(DATA.monthly.findIndex((m) => m.crashes === peak) + 1).padStart(2, "0");
+  const peakMM = String(peakIdx + 1).padStart(2, "0");
   const inPeak = DATA.topDates.filter((d) => d.date.startsWith(peakMM)).length;
+  let compare = "";
+  if (other) {
+    const otherPeak = other.monthly[peakIdx].crashes;
+    compare = ` ${peakName} ${other.year} had ${otherPeak.toLocaleString()} (${pctChange(primaryPeak, otherPeak) || "no comparison"} in ${DATA.year}).`;
+    if (DATA.partial && DATA.through) {
+      const mmdd = DATA.through.slice(5);
+      const sameSpan = other.daily.reduce((sum, days, m) => sum + days.reduce((s2, n, d) => {
+        const key = `${String(m + 1).padStart(2, "0")}-${String(d + 1).padStart(2, "0")}`;
+        return key <= mmdd ? s2 + n : s2;
+      }, 0), 0);
+      compare += ` Year to date: ${DATA.totalCrashes.toLocaleString()} crashes in ${DATA.year} vs ${sameSpan.toLocaleString()} by ${formatIsoDate(`${other.year}-${mmdd}`)} (${pctChange(DATA.totalCrashes, sameSpan)}).`;
+    }
+  }
   $("#monthNote").textContent =
     `${inPeak} of the 10 worst individual days in ${periodLabel()} were in ${peakName}. The worst single day was ` +
-    `${formatDate(worst.date)}, with ${worst.crashes} crashes in 24 hours.` +
-    (DATA.partial && DATA.through ? ` ${MONTHS[last]} is still in progress: data runs through ${formatIsoDate(DATA.through)}.` : "");
+    `${formatDate(worst.date)}, with ${worst.crashes} crashes in 24 hours.` + compare +
+    (DATA.partial && DATA.through ? ` ${MONTHS[last]} ${DATA.year} is still in progress: data runs through ${formatIsoDate(DATA.through)}.` : "");
 }
 
 /* ---------- day-by-day chart for one month ---------- */
@@ -141,10 +194,10 @@ function renderMonthChart() {
 function renderMonthPicker() {
   const last = lastDataMonth();
   $("#monthPicker").innerHTML = DATA.monthly.map((m, i) =>
-    `<button class="month-pill${i === selectedMonth ? " active" : ""}" data-month="${i}" role="tab"
-      aria-selected="${i === selectedMonth}" ${i > last ? "disabled" : ""}>${m.month}</button>`
+    `<button class="month-pill${i === selectedMonth ? " active" : ""}${i > last ? " ahead" : ""}" data-month="${i}" role="tab"
+      aria-selected="${i === selectedMonth}">${m.month}</button>`
   ).join("");
-  $("#monthPicker").querySelectorAll(".month-pill:not([disabled])").forEach((button) => {
+  $("#monthPicker").querySelectorAll(".month-pill").forEach((button) => {
     button.addEventListener("click", () => {
       selectedMonth = Number(button.dataset.month);
       renderMonthPicker();
@@ -156,38 +209,78 @@ function renderMonthPicker() {
 function renderDayChart() {
   const now = new Date();
   const isCurrentMonth = selectedMonth === now.getMonth() && year === now.getFullYear();
-  const inProgress = DATA.partial && selectedMonth === lastDataMonth() && DATA.through;
-  const throughDay = inProgress ? Number(DATA.through.split("-")[2]) : null;
-  const allDays = DATA.daily[selectedMonth] || [];
-  const days = throughDay ? allDays.slice(0, throughDay) : allDays;   // ignore days that have not happened yet
-  const total = days.reduce((sum, n) => sum + n, 0);
-  const peak = Math.max(...days, 1);
+  const series = chartSeries((d) => d.daily[selectedMonth] || []);
+  const other = otherYearData();
+
+  // For a partial year, days after the latest crash date have no data yet.
+  const cutoff = (s) => {
+    if (!s.partial || !s.through) return Infinity;
+    const [, mm, dd] = s.through.split("-").map(Number);
+    return selectedMonth < mm - 1 ? Infinity : selectedMonth === mm - 1 ? dd : 0;
+  };
+  const daysInMonth = Math.max(...series.map((s) => s.data.length));
+  const peakAll = Math.max(...series.flatMap((s) => s.data.slice(0, cutoff(s))), 1);
+  const primary = series.find((s) => s.primary);
+  const primaryDays = primary.data.slice(0, cutoff(primary));
+  const primaryTotal = primaryDays.reduce((a, b) => a + b, 0);
+  const primaryPeak = Math.max(...primaryDays, 0);
+  const primaryCut = cutoff(primary);
 
   $("#dayKicker").textContent = isCurrentMonth ? "This month, day by day" : "One month, day by day";
-  $("#dayTitle").textContent = `${MONTHS[selectedMonth]} ${year}` +
-    (isCurrentMonth ? "" : (selectedMonth === now.getMonth() ? " (this month, last year)" : ""));
-  $("#dayTotal").textContent = `${total.toLocaleString()} crashes / ${(total / Math.max(days.length, 1)).toFixed(1)} per day`;
+  $("#dayTitle").textContent = `${MONTHS[selectedMonth]}, ${series.map((s) => s.year).join(" vs ")}`;
+  $("#dayTotal").textContent = series.map((s) => {
+    const days = s.data.slice(0, cutoff(s));
+    const total = days.reduce((a, b) => a + b, 0);
+    return `${s.year}: ${total.toLocaleString()}${days.length && days.length < s.data.length ? ` (to the ${days.length}${ordinal(days.length)})` : ""}`;
+  }).join(" / ");
+  $("#dayLegend").innerHTML = legendHtml(series);
 
-  $("#dayChart").innerHTML = allDays.map((n, i) => {
-    const future = throughDay && i >= throughDay;
-    const pct = Math.round((n / peak) * 100);
-    const cls = (n === peak && !future ? " peak" : "") + (future ? " future" : "");
-    return `<div class="day-col${cls}" title="${MONTHS[selectedMonth]} ${i + 1}: ${future ? "no data yet" : `${n} crashes`}">
-      <span class="day-value">${future ? "" : n}</span>
-      <div class="bar-wrap"><div class="day-bar" style="height:${future ? 0 : Math.max(pct, 2)}%"></div></div>
+  $("#dayChart").innerHTML = Array.from({ length: daysInMonth }, (_, i) => {
+    const bars = series.map((s) => {
+      const n = s.data[i] || 0;
+      const noData = i >= cutoff(s) || i >= s.data.length;
+      const cls = (s.primary ? " primary" : " secondary") + (s.primary && n === primaryPeak && primaryPeak > 0 && !noData ? " peak" : "") + (noData ? " none" : "");
+      return `<div class="day-bar${cls}" style="height:${noData ? 0 : Math.max(Math.round((n / peakAll) * 100), 2)}%"></div>`;
+    });
+    const tip = series.map((s) => `${s.year}: ${i >= cutoff(s) ? "no data yet" : s.data[i] || 0}`).join(" / ");
+    const future = i >= primaryCut;
+    return `<div class="day-col${future ? " future" : ""}" title="${MONTHS[selectedMonth]} ${i + 1}. ${tip}">
+      <span class="day-value">${future ? "" : (primary.data[i] || 0)}</span>
+      <div class="bar-wrap">${bars.join("")}</div>
       <span class="day-label">${i + 1}</span>
     </div>`;
   }).join("");
 
-  const worstDay = days.indexOf(peak) + 1;
-  const quietDays = days.filter((n) => n === 0).length;
-  const share = Math.round((total / DATA.totalCrashes) * 100);
-  $("#dayNote").textContent =
-    (inProgress
-      ? `${MONTHS[selectedMonth]} has had ${total.toLocaleString()} animal-related crashes so far (data through ${formatIsoDate(DATA.through)}). `
-      : `${MONTHS[selectedMonth]} had ${total.toLocaleString()} animal-related crashes, ${share}% of ${periodLabel()}. `) +
-    `The worst day was ${MONTHS[selectedMonth]} ${worstDay} with ${peak}. ` +
-    (quietDays ? `${quietDays} day${quietDays === 1 ? "" : "s"} had none.` : `Every single day had at least one.`);
+  let note;
+  if (primaryDays.length === 0) {
+    note = `No ${DATA.year} data for ${MONTHS[selectedMonth]} yet.`;
+  } else {
+    const worstDay = primaryDays.indexOf(primaryPeak) + 1;
+    const quietDays = primaryDays.filter((n) => n === 0).length;
+    note = (primaryCut < primary.data.length
+      ? `${MONTHS[selectedMonth]} ${DATA.year} has had ${primaryTotal.toLocaleString()} animal-related crashes so far (data through ${formatIsoDate(DATA.through)}). `
+      : `${MONTHS[selectedMonth]} ${DATA.year} had ${primaryTotal.toLocaleString()} animal-related crashes, ${Math.round((primaryTotal / DATA.totalCrashes) * 100)}% of ${periodLabel()}. `) +
+      `The worst day was ${MONTHS[selectedMonth]} ${worstDay} with ${primaryPeak}. ` +
+      (quietDays ? `${quietDays} day${quietDays === 1 ? "" : "s"} had none. ` : `Every day had at least one. `);
+  }
+  if (other) {
+    const otherSeries = series.find((s) => !s.primary);
+    const otherAll = otherSeries.data.reduce((a, b) => a + b, 0);
+    const otherSame = otherSeries.data.slice(0, Math.min(primaryDays.length, cutoff(otherSeries))).reduce((a, b) => a + b, 0);
+    if (primaryDays.length && primaryDays.length < primary.data.length) {
+      note += `Same days in ${other.year}: ${otherSame.toLocaleString()} (${DATA.year} is ${pctChange(primaryTotal, otherSame) || "level"}); all of ${MONTHS[selectedMonth]} ${other.year}: ${otherAll.toLocaleString()}.`;
+    } else if (primaryDays.length) {
+      note += `${MONTHS[selectedMonth]} ${other.year}: ${otherAll.toLocaleString()} (${DATA.year} is ${pctChange(primaryTotal, otherAll) || "level"}).`;
+    } else {
+      note += `${MONTHS[selectedMonth]} ${other.year} had ${otherAll.toLocaleString()}.`;
+    }
+  }
+  $("#dayNote").textContent = note;
+}
+
+function ordinal(n) {
+  const s = ["th", "st", "nd", "rd"], v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
 }
 
 function renderWeekdayStrip() {
@@ -447,7 +540,14 @@ function drawCorridors() {
     mapShapes.push(marker);
   });
 
-  if (list.length) googleMap.fitBounds(bounds, 40);
+  if (list.length) {
+    google.maps.event.trigger(googleMap, "resize");
+    googleMap.fitBounds(bounds, 40);
+    // If the container had no size yet (phone webview on first paint), fitBounds gives a world view.
+    google.maps.event.addListenerOnce(googleMap, "idle", () => {
+      if (googleMap.getZoom() < 5) { googleMap.setCenter({ lat: 41.9, lng: -93.5 }); googleMap.setZoom(6); }
+    });
+  }
 }
 
 /* Badge and footer counts must not depend on the map loading. */
@@ -481,6 +581,7 @@ $("#closePopup").addEventListener("click", () => $("#approachPopup").classList.r
 
 /* Inside the phone app: start the native background alert service and use location straight away. */
 const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+if (isNativeApp) document.body.classList.add("native");
 if (isNativeApp && window.Capacitor.Plugins && window.Capacitor.Plugins.CorridorAlert) {
   window.Capacitor.Plugins.CorridorAlert.start().catch(() => undefined);
 }
