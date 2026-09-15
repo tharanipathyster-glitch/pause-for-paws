@@ -43,6 +43,10 @@ jobs:
           mkdir -p dist
           cp index.html app.js styles.css privacy-policy.html corridors.json iowa-zips.json dist/
           echo "window.GOOGLE_MAPS_API_KEY = \"$GOOGLE_MAPS_API_KEY\";" > dist/google-maps-config.js
+          # Cache-busting: stamp every asset URL with this commit so browsers never keep an old app.js
+          V="${GITHUB_SHA::10}"
+          sed -i "s|href=\"styles.css\"|href=\"styles.css?v=$V\"|; s|src=\"app.js\"|src=\"app.js?v=$V\"|; s|src=\"google-maps-config.js\"|src=\"google-maps-config.js?v=$V\"|" dist/index.html
+          sed -i "s|fetch(\"corridors.json\")|fetch(\"corridors.json?v=$V\")|; s|fetch(\"iowa-zips.json\")|fetch(\"iowa-zips.json?v=$V\")|" dist/app.js
           echo "pauseforpawsusa.org" > dist/CNAME
 
       - name: Upload artifact

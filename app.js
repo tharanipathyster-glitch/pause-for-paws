@@ -482,6 +482,8 @@ function loadGoogleMap() {
     });
     $("#mapCanvas").classList.add("google-map-ready");
     drawCorridors();
+    // The webview can report a zero-size container on first paint; re-frame once tiles are in.
+    google.maps.event.addListenerOnce(googleMap, "tilesloaded", () => { google.maps.event.trigger(googleMap, "resize"); fitView(); });
   };
   const script = document.createElement("script");
   script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(window.GOOGLE_MAPS_API_KEY)}&callback=initGoogleMap&v=weekly&loading=async`;
@@ -540,12 +542,25 @@ function drawCorridors() {
     mapShapes.push(marker);
   });
 
-  if (list.length) {
-    google.maps.event.trigger(googleMap, "resize");
-    googleMap.fitBounds(bounds, 40);
-    // If the container had no size yet (phone webview on first paint), fitBounds gives a world view.
+  fitView();
+}
+
+/* Frame the whole state (or the Des Moines area) with fixed bounds, so the view never depends on
+   the map's size at draw time. Re-applied once the map has laid out, which matters in the phone webview. */
+const IOWA_BOUNDS = { north: 43.55, south: 40.35, east: -90.10, west: -96.65 };
+const METRO_BOUNDS = { north: 42.10, south: 41.15, east: -92.90, west: -94.55 };
+let viewPending = false;
+function fitView() {
+  if (!googleMap || !window.google) return;
+  const box = view === "metro" ? METRO_BOUNDS : IOWA_BOUNDS;
+  googleMap.fitBounds(box, 24);
+  if (!viewPending) {
+    viewPending = true;
     google.maps.event.addListenerOnce(googleMap, "idle", () => {
-      if (googleMap.getZoom() < 5) { googleMap.setCenter({ lat: 41.9, lng: -93.5 }); googleMap.setZoom(6); }
+      viewPending = false;
+      const c = googleMap.getCenter();
+      const offIowa = !c || c.lat() < IOWA_BOUNDS.south || c.lat() > IOWA_BOUNDS.north || c.lng() < IOWA_BOUNDS.west || c.lng() > IOWA_BOUNDS.east;
+      if (googleMap.getZoom() < 5 || offIowa) googleMap.fitBounds(box, 24);
     });
   }
 }
