@@ -2,8 +2,6 @@
    Reads corridors.json (precomputed from Iowa DOT 2025 crash records).
    No backend required: this page works on any static host. */
 
-const SIGHTING_FORM_URL = ""; // <-- paste your Google Form link here
-
 let DATA = null;
 let view = "statewide";
 let selectedMonth = new Date().getMonth(); // 0-11, defaults to the current calendar month
@@ -24,11 +22,21 @@ function currentCorridors() {
   return view === "metro" ? DATA.desMoines.corridors : DATA.corridors;
 }
 
+/* ---------- header date (today, refreshed at midnight) ---------- */
+
+function renderTodayStamp() {
+  const now = new Date();
+  $("#updatedStamp").textContent = now.toLocaleDateString("en-US",
+    { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  window.setTimeout(renderTodayStamp, midnight - now + 1000);
+}
+renderTodayStamp();
+
 /* ---------- header numbers ---------- */
 
 function renderStats() {
   $("#dataStamp").textContent = `Iowa DOT crash records ${DATA.year}`;
-  $("#updatedStamp").textContent = `built ${formatIsoDate(DATA.generated)}`;
   $("#statCrashesLabel").textContent = `Crashes in ${DATA.year}`;
   $("#statCrashes").textContent = DATA.totalCrashes.toLocaleString();
   $("#statInjury").textContent = DATA.injuryOrWorse.toLocaleString();
@@ -133,13 +141,15 @@ function renderWeekdayStrip() {
 
 /* ---------- corridor table ---------- */
 
-function renderCorridorList(list) {
-  const rows = list.slice(0, 25);
-  $("#corridorCount").textContent = `${list.length.toLocaleString()} corridors`;
+const LIST_LIMIT = 10;
+
+function renderCorridorList(list, label) {
+  const rows = list.slice(0, LIST_LIMIT);
+  $("#corridorCount").textContent = label || `${list.length.toLocaleString()} corridors`;
   $("#corridorList").innerHTML = rows.length ? rows.map((c, i) => `
     <article class="risk-row" data-id="${c.id}">
       <div class="risk-rank">${i + 1}</div>
-      <div><strong>${c.id}</strong><span>${c.lat.toFixed(3)}, ${c.lng.toFixed(3)}</span></div>
+      <div><strong>${c.id}</strong><span>${c.distanceMi != null ? `${c.distanceMi.toFixed(1)} mi away / ` : ""}${c.lat.toFixed(3)}, ${c.lng.toFixed(3)}</span></div>
       <div class="risk-animals">${c.risk}</div>
       <div class="risk-score"><b>${c.crashes}</b><span>crashes in 2025</span></div>
       <button class="simulate-button" data-id="${c.id}">Show driver message <span>→</span></button>
@@ -152,10 +162,46 @@ function renderCorridorList(list) {
     });
   });
 
-  if (rows.length < list.length) {
+  if (rows.length < list.length && !label) {
     $("#corridorList").insertAdjacentHTML("beforeend",
-      `<p class="empty-state">Showing the 25 worst of ${list.length.toLocaleString()} corridors. Search by ID to find others.</p>`);
+      `<p class="empty-state">Showing the ${LIST_LIMIT} worst of ${list.length.toLocaleString()} corridors. Enter a ZIP code to see the ones near you.</p>`);
   }
+}
+
+/* ---------- ZIP code search ---------- */
+
+let ZIPS = null; // { "50263": [lat, lng], ... } Iowa ZCTA centroids from the US Census gazetteer
+
+function distanceMiles(aLat, aLng, bLat, bLng) {
+  const r = Math.PI / 180;
+  const dLat = (bLat - aLat) * r, dLng = (bLng - aLng) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(aLat * r) * Math.cos(bLat * r) * Math.sin(dLng / 2) ** 2;
+  return 3958.8 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function searchByZip(zip) {
+  const centre = ZIPS && ZIPS[zip];
+  if (!centre) {
+    $("#corridorCount").textContent = ZIPS ? "ZIP not found" : "loading ZIP codes";
+    $("#corridorList").innerHTML = `<p class="empty-state">${ZIPS ? `${zip} is not an Iowa ZIP code we know. Try another, or search by corridor ID.` : "One moment..."}</p>`;
+    return;
+  }
+  const [lat, lng] = centre;
+  const nearest = currentCorridors()
+    .map((c) => ({ ...c, distanceMi: distanceMiles(lat, lng, c.lat, c.lng) }))
+    .sort((a, b) => a.distanceMi - b.distanceMi);
+  renderCorridorList(nearest, `10 nearest to ${zip}`);
+  if (googleMap) {
+    googleMap.panTo({ lat, lng });
+    googleMap.setZoom(10);
+  }
+}
+
+function runSearch(raw) {
+  const query = raw.trim().toLowerCase();
+  if (!query) { renderCorridorList(currentCorridors()); return; }
+  if (/^\d{5}$/.test(query)) { searchByZip(query); return; }
+  renderCorridorList(currentCorridors().filter((c) => c.id.toLowerCase().includes(query)));
 }
 
 function selectCorridor(corridor, pan) {
@@ -270,20 +316,12 @@ function setView(next) {
 
 $("#viewStatewide").addEventListener("click", () => setView("statewide"));
 $("#viewMetro").addEventListener("click", () => setView("metro"));
-$("#reportButton").addEventListener("click", () =>
-  $("#reportSection").scrollIntoView({ behavior: "smooth" }));
-$("#corridorSearch").addEventListener("input", (event) => {
-  const query = event.target.value.trim().toLowerCase();
-  renderCorridorList(currentCorridors().filter((c) => c.id.toLowerCase().includes(query)));
-});
+$("#corridorSearch").addEventListener("input", (event) => runSearch(event.target.value));
 
-if (SIGHTING_FORM_URL) {
-  $("#reportLink").href = SIGHTING_FORM_URL;
-} else {
-  const link = $("#reportLink");
-  link.href = "mailto:hello@pauseforpawsusa.org?subject=Animal%20crossing%20sighting";
-  link.innerHTML = "Email us a sighting <span>→</span>";
-}
+fetch("iowa-zips.json")
+  .then((response) => (response.ok ? response.json() : null))
+  .then((zips) => { ZIPS = zips; if ($("#corridorSearch").value) runSearch($("#corridorSearch").value); })
+  .catch(() => { ZIPS = null; });
 
 fetch("corridors.json")
   .then((response) => {

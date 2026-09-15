@@ -4,7 +4,7 @@ A standalone prototype for turning wildlife detection coordinates into a corrido
 
 ## Data credit
 
-Crash data referenced by this project comes from the [Iowa Department of Transportation Open Data portal](https://public-iowadot.opendata.arcgis.com/) (Crash Data / SOR dataset). Iowa DOT does not endorse this project. This app performs its own historical pattern analysis on that data; it is not an official Iowa DOT product, and figures shown are illustrative unless explicitly sourced. Data may be incomplete, delayed, or revised upstream — always drive to conditions, not to this app.
+Crash data referenced by this project comes from the [Iowa Department of Transportation Open Data portal](https://public-iowadot.opendata.arcgis.com/) (Crash Data / SOR dataset). The analysis is independent and is currently under review with Iowa DOT; it is not an official Iowa DOT product. This app performs its own historical pattern analysis on that data; it is not an official Iowa DOT product, and figures shown are illustrative unless explicitly sourced. Data may be incomplete, delayed, or revised upstream — always drive to conditions, not to this app.
 
 ## Run it
 

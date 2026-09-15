@@ -19,7 +19,6 @@
           <span>pause <span>for paws</span></span>
       </a>
       <div class="topbar-status"><span class="status-dot"></span> <span id="dataStamp">Iowa DOT crash records</span> <span class="divider"></span> <span id="updatedStamp">—</span></div>
-      <button class="icon-button" id="reportButton" title="Report a sighting" aria-label="Report a sighting">↓</button>
     </header>
 
     <main id="top">
@@ -103,27 +102,12 @@
           <span class="mono" id="corridorCount">—</span>
         </div>
         <div class="risk-toolbar">
-          <label class="search-box" for="corridorSearch"><span>⌕</span><input id="corridorSearch" type="search" placeholder="Search by corridor ID" aria-label="Search corridors"></label>
+          <label class="search-box" for="corridorSearch"><span>⌕</span><input id="corridorSearch" type="search" inputmode="numeric" placeholder="Enter a ZIP code (e.g. 50263) or corridor ID" aria-label="Search corridors by ZIP code or corridor ID"></label>
           <button class="secondary-button" id="viewStatewide">Statewide</button>
           <button class="secondary-button" id="viewMetro">Des Moines area</button>
         </div>
         <div class="risk-list" id="corridorList"></div>
-        <p class="data-note">A corridor is a group of crashes within about 4 km of each other. Corridors with fewer than 3 crashes are not listed. Coordinates are the centre of the group, not an exact crash location.</p>
-      </section>
-
-      <section class="feed-section panel" id="reportSection">
-        <div class="feed-copy">
-          <span class="kicker">Help us fix the biggest gap</span>
-          <h2>Did you hit one, or nearly hit one?</h2>
-          <p>About <b>40% of deer crashes are never reported to police</b>, according to an Iowa State University study. That means this map — and every official map — is missing almost half of what really happens. If you tell us where it happened to you, we can start filling that in.</p>
-          <div class="feed-notes"><span>Takes one minute</span><span>No personal details needed</span><span>We never publish your name</span></div>
-        </div>
-        <div class="feed-form">
-          <label for="reportLink">Report a sighting</label>
-          <p class="report-copy">Tell us the road, the nearest town, and roughly when. That is all we need.</p>
-          <a class="primary-button" id="reportLink" href="#" target="_blank" rel="noopener">Open the sighting form <span>→</span></a>
-          <p class="report-copy small">Questions, or want to use this data? Email <a href="mailto:hello@pauseforpawsusa.org">hello@pauseforpawsusa.org</a></p>
-        </div>
+        <p class="data-note">A corridor is a group of crashes within about 4 km of each other. Corridors with fewer than 3 crashes are not listed. Coordinates are the centre of the group, not an exact crash location. Enter an Iowa ZIP code to see the 10 corridors closest to it.</p>
       </section>
 
       <section class="corridor-section" id="how">
@@ -151,7 +135,7 @@
 
     <footer>
       <span>Pause for Paws — a student project, Waukee, Iowa</span>
-      <span>Crash data: Iowa DOT public crash records, 2025. Iowa DOT does not endorse this project.</span>
+      <span>Crash data: Iowa DOT public crash records, 2025. Our analysis is independent and is currently under review with Iowa DOT; it is not an official Iowa DOT product.</span>
     </footer>
   </div>
   <div class="toast" id="toast" role="status"></div>
