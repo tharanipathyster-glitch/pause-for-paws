@@ -153,6 +153,39 @@ def is_injury(sev):
     return "Injury" in sev or "Fatal" in sev
 
 
+class PointIndex:
+    """Grid-bucketed rows so we can count crashes within RADIUS_KM of any centre quickly."""
+    def __init__(self, rows):
+        self.grid = collections.defaultdict(list)
+        for r in rows:
+            self.grid[(int(r["lat"] / CELL), int(r["lng"] / CELL))].append(r)
+
+    def near(self, lat, lng):
+        ci, cj = int(lat / CELL), int(lng / CELL)
+        out = []
+        for di in (-1, 0, 1):
+            for dj in (-1, 0, 1):
+                for r in self.grid.get((ci + di, cj + dj), ()):
+                    if dist_km(lat, lng, r["lat"], r["lng"]) <= RADIUS_KM:
+                        out.append(r)
+        return out
+
+
+def compare_years(corridors, other_year, other_index, through_mmdd):
+    """Attach what the *other* year looked like on the same stretch of road.
+
+    through_mmdd is the 'MMDD' of the latest crash in the partial year, so the full year
+    can also report how many crashes it had by that same date ("same period")."""
+    for c in corridors:
+        near = other_index.near(c["lat"], c["lng"])
+        c["compare"] = {
+            "year": other_year,
+            "crashes": len(near),
+            "injuryOrWorse": sum(1 for r in near if is_injury(r["sev"])),
+            "samePeriod": sum(1 for r in near if r["date"][4:] <= through_mmdd) if through_mmdd else None,
+        }
+
+
 def summarize(clusters, prefix, limit=None, min_crashes=1):
     out = []
     ranked = sorted(clusters, key=lambda c: len(c["pts"]), reverse=True)
@@ -231,16 +264,28 @@ def build_year(year, rows, source):
 
 # ---------------------------------------------------------------- main
 
-years = {}
+years, rows_by_year = {}, {}
 for year in YEARS:
     rows, source = load_year(year)
     if rows:
         years[str(year)] = build_year(year, rows, source)
+        rows_by_year[year] = rows
 
 if not years:
     sys.exit("no crash data available (live fetch failed and no cache)")
 
 default_year = max(int(y) for y in years)
+prev_year = default_year - 1
+if str(prev_year) in years:
+    cur, prev = years[str(default_year)], years[str(prev_year)]
+    through_mmdd = cur["through"].replace("-", "")[4:] if cur.get("through") else None
+    cur_index, prev_index = PointIndex(rows_by_year[default_year]), PointIndex(rows_by_year[prev_year])
+    for key in ("corridors",):
+        compare_years(cur[key], prev_year, prev_index, through_mmdd)
+        compare_years(prev[key], default_year, cur_index, None)
+    compare_years(cur["desMoines"]["corridors"], prev_year, prev_index, through_mmdd)
+    compare_years(prev["desMoines"]["corridors"], default_year, cur_index, None)
+
 payload = {
     "generated": datetime.date.today().isoformat(),
     "source": "Iowa DOT Crash Data feature service (Traffic_Safety/Crash_Data), crashes whose major cause is Animal",
@@ -250,3 +295,34 @@ payload = {
 }
 OUT.write_text(json.dumps(payload, separators=(",", ":")))
 print("wrote", OUT, OUT.stat().st_size, "bytes; default year", default_year)
+
+# ---- native app feed (Android/iOS background alerts read data/corridors.json, "events" format)
+# Elevated/Highest corridors from the current year, plus last year's Highest ones that are
+# not already covered, plus the reviewed driver reports.
+cur = years[str(default_year)]
+events = []
+def add_event(lat, lng, species, road, count, risk, eid):
+    events.append({"id": eid, "name": road, "lat": lat, "lng": lng, "species": species, "confidence": 0.8,
+                   "reportedAt": f"{default_year}-01-01T00:00:00Z", "road": road, "count": count, "risk": risk})
+for c in cur["corridors"]:
+    if c["crashes"] >= 5:
+        add_event(c["lat"], c["lng"], "animal-crash", f"Corridor {c['id']}, {c['crashes']} crashes in {default_year} so far",
+                  c["crashes"], c["risk"], f"{default_year}-{c['id']}")
+if str(prev_year) in years:
+    for c in years[str(prev_year)]["corridors"]:
+        if c["risk"] == "Highest" and not any(dist_km(c["lat"], c["lng"], e["lat"], e["lng"]) <= RADIUS_KM for e in events):
+            add_event(c["lat"], c["lng"], "animal-crash", f"Corridor {c['id']}, {c['crashes']} crashes in {prev_year}",
+                      c["crashes"], c["risk"], f"{prev_year}-{c['id']}")
+for r in USER_REPORTS:
+    add_event(r["lat"], r["lng"], r["species"], r["road"], 1, "Monitored", r["id"])
+feed = {
+    "updatedAt": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "expiresAt": (datetime.date.today() + datetime.timedelta(days=120)).isoformat() + "T00:00:00Z",
+    "source": payload["source"],
+    "dataType": "historical",
+    "totalCount": cur["totalCrashes"],
+    "events": events,
+}
+FEED = CACHE_DIR / "corridors.json"
+FEED.write_text(json.dumps(feed, indent=2))
+print("wrote", FEED, "with", len(events), "alert zones")

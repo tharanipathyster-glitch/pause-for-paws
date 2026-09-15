@@ -161,3 +161,5 @@ a.primary-button { text-decoration: none; }
 .month-col.partial .month-bar, .day-col.partial .day-bar { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 4px, transparent 4px 8px); }
 .month-col.future .month-label, .day-col.future .day-label { opacity: .4; }
 .month-pill[disabled] { opacity: .35; cursor: default; }
+
+.risk-trend { display: block; color: var(--muted); font: 10px var(--mono); margin-top: 3px; }

@@ -215,7 +215,7 @@ function renderCorridorList(list, label) {
     <article class="risk-row" data-id="${c.id}">
       <div class="risk-rank">${i + 1}</div>
       <div><strong>${c.id}</strong><span>${c.distanceMi != null ? `${c.distanceMi.toFixed(1)} mi away / ` : ""}${c.lat.toFixed(3)}, ${c.lng.toFixed(3)}</span></div>
-      <div class="risk-animals">${c.risk}</div>
+      <div class="risk-animals">${c.risk}<span class="risk-trend">${trendTag(c)}</span></div>
       <div class="risk-score"><b>${c.crashes}</b><span>crashes in ${periodLabel()}</span></div>
       <button class="simulate-button" data-id="${c.id}">Show driver message <span>→</span></button>
     </article>`).join("") : `<p class="empty-state">No corridors match that search.</p>`;
@@ -269,12 +269,43 @@ function runSearch(raw) {
   renderCorridorList(currentCorridors().filter((c) => c.id.toLowerCase().includes(query)));
 }
 
+/* One sentence comparing this year with last year on the same stretch of road. */
+function trendSentence(corridor) {
+  const cmp = corridor.compare;
+  if (!cmp) return "";
+  const hurt = (n) => (n ? ` (${n} hurt someone)` : "");
+  if (DATA.partial) {
+    // Showing the current year: compare with the same period last year, then the full year.
+    let pace = "";
+    if (cmp.samePeriod != null && cmp.samePeriod > 0) {
+      const change = Math.round(((corridor.crashes - cmp.samePeriod) / cmp.samePeriod) * 100);
+      pace = Math.abs(change) < 10 ? "about the same pace as last year"
+        : change > 0 ? `up ${change}% on last year` : `down ${Math.abs(change)}% on last year`;
+    } else if (cmp.samePeriod === 0) {
+      pace = "none by this date last year";
+    }
+    return ` By this date in ${cmp.year} it had ${cmp.samePeriod ?? "no"} ${pace ? `(${pace})` : ""}` +
+      `, and ${cmp.crashes} across all of ${cmp.year}${hurt(cmp.injuryOrWorse)}.`;
+  }
+  // Showing last year: say what this year looks like so far.
+  const cur = ALL.years[cmp.year];
+  return ` So far in ${cmp.year}${cur && cur.through ? ` (through ${formatIsoDate(cur.through)})` : ""} it has had ${cmp.crashes}${hurt(cmp.injuryOrWorse)}.`;
+}
+
+function trendTag(corridor) {
+  const cmp = corridor.compare;
+  if (!cmp) return "";
+  if (DATA.partial) return cmp.samePeriod != null ? `${cmp.samePeriod} by this date in ${cmp.year}` : `${cmp.crashes} in ${cmp.year}`;
+  return `${cmp.crashes} so far in ${cmp.year}`;
+}
+
 function selectCorridor(corridor, pan) {
   $("#alertTitle").textContent = "Pause for Paws";
   $("#alertMessage").textContent =
     `${corridor.crashes} animal-related crashes were recorded on this stretch of road in ${periodLabel()}` +
     (corridor.injuryOrWorse ? `, and ${corridor.injuryOrWorse} of them hurt someone` : "") +
-    `. Slow down and watch both shoulders. This is a historical pattern, not a live animal location.`;
+    `.` + trendSentence(corridor) +
+    ` Slow down and watch both shoulders. This is a historical pattern, not a live animal location.`;
   $("#alertSpecies").textContent = `${corridor.id} / ${corridor.risk}`;
   if (pan && googleMap) {
     googleMap.panTo({ lat: corridor.lat, lng: corridor.lng });
