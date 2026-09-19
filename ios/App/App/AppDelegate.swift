@@ -9,9 +9,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // iOS relaunches the app in the background for a significant location change; the web view
         // (and the CorridorAlert plugin) never load in that case, so resume monitoring natively.
-        if launchOptions?[.location] != nil {
-            CorridorAlertMonitor.shared.resumeIfEnabled()
-        }
+        // Done on every launch rather than only when launchOptions carries .location: scene-based apps
+        // do not reliably receive that key, and resuming is idempotent.
+        CorridorAlertMonitor.shared.resumeIfEnabled()
         return true
     }
 
