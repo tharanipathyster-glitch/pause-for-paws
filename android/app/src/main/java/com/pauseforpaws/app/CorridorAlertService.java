@@ -31,25 +31,25 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
+import java.util.Set;
 
-// Foreground service: shows an ongoing "monitoring" notification and, when the device is near a
-// bundled historical wildlife-collision corridor, posts an alert notification and speaks it so it
-// reaches the driver over Bluetooth / Android Auto car audio. Mirrors the iOS CorridorAlertMonitor.
+// Foreground service: shows the ongoing "monitoring" notification Android requires and speaks a
+// short alert when the driver enters a bundled historical wildlife-collision corridor, so it reaches
+// them over Bluetooth / Android Auto car audio. Voice only, by design. Mirrors iOS CorridorAlertMonitor.
 public class CorridorAlertService extends Service implements LocationListener {
     public static final String CHANNEL_MONITOR = "pause_for_paws_monitor";
-    public static final String CHANNEL_ALERT = "pause_for_paws_alert";
     private static final int MONITOR_NOTIFICATION_ID = 1001;
     private static final double ALERT_RADIUS_MILES = 2.0;
-    private static final long ALERT_COOLDOWN_MS = 10 * 60 * 1000; // per corridor
-    private static final long ALERT_SPACING_MS = 2 * 60 * 1000;   // between any two alerts
+    private static final double EXIT_RADIUS_MILES = 3.0;         // re-arm a zone only once clearly past it
+    private static final long ALERT_SPACING_MS = 2 * 60 * 1000;  // between any two alerts
+    private static final float MIN_DRIVING_SPEED_MPS = 8.9f;     // about 20 mph
 
     private LocationManager locationManager;
     private final List<Corridor> corridors = new ArrayList<>();
-    private final Map<String, Long> lastAlertedAt = new HashMap<>();
+    private final Set<String> insideCorridorIds = new HashSet<>();
     private long lastAlertAt = 0;
     private TextToSpeech tts;
     private boolean ttsReady = false;
@@ -58,12 +58,10 @@ public class CorridorAlertService extends Service implements LocationListener {
     private static class Corridor {
         String id;
         String species; // "animal-crash" for DOT clusters, or a real animal for reported crossings
-        int count;
         double lat;
         double lng;
 
-        // Driver-facing wording shared by the notification and the spoken alert. Kept short:
-        // read at a glance on the lock screen, one breath when spoken.
+        // Driver-facing wording for the spoken alert, kept to one breath so it never competes with the road.
         String animal() {
             String s = species == null ? "" : species.trim().toLowerCase(Locale.US);
             if (s.isEmpty() || s.equals("animal-crash") || s.equals("animal-related crashes") || s.equals("wildlife")) return null;
@@ -71,9 +69,6 @@ public class CorridorAlertService extends Service implements LocationListener {
         }
         String headline() { return (animal() == null ? "Wildlife" : animal()) + " crossing ahead"; }
         String advice() { return animal() == null ? "Watch for deer." : "Watch both sides."; }
-        String notificationBody() {
-            return count > 1 ? headline() + " \u2014 " + count + " crashes this year. " + advice() : headline() + ". " + advice();
-        }
         String speech() { return "Pause for Paws. " + headline() + ". " + advice(); }
     }
 
@@ -128,11 +123,8 @@ public class CorridorAlertService extends Service implements LocationListener {
             NotificationManager manager = getSystemService(NotificationManager.class);
             NotificationChannel monitor = new NotificationChannel(CHANNEL_MONITOR, "Pause for Paws monitoring", NotificationManager.IMPORTANCE_LOW);
             monitor.setDescription("Shows when background corridor monitoring is active.");
-            NotificationChannel alert = new NotificationChannel(CHANNEL_ALERT, "Pause for Paws corridor alerts", NotificationManager.IMPORTANCE_HIGH);
-            alert.setDescription("Historical wildlife-collision corridor alerts.");
             if (manager != null) {
                 manager.createNotificationChannel(monitor);
-                manager.createNotificationChannel(alert);
             }
         }
     }
@@ -151,7 +143,6 @@ public class CorridorAlertService extends Service implements LocationListener {
                 Corridor corridor = new Corridor();
                 corridor.id = event.optString("id", "corridor-" + i);
                 corridor.species = event.optString("species", "");
-                corridor.count = event.optInt("count", 0);
                 corridor.lat = event.optDouble("lat");
                 corridor.lng = event.optDouble("lng");
                 if (Double.isNaN(corridor.lat) || Double.isNaN(corridor.lng)) continue;
@@ -201,28 +192,30 @@ public class CorridorAlertService extends Service implements LocationListener {
 
     @Override
     public void onLocationChanged(Location location) {
-        // Corridors overlap; only the nearest one gets to speak.
         Corridor nearest = null;
         double nearestDistance = ALERT_RADIUS_MILES;
+        List<Corridor> inRange = new ArrayList<>();
         for (Corridor corridor : corridors) {
             double distance = distanceMiles(location.getLatitude(), location.getLongitude(), corridor.lat, corridor.lng);
-            if (distance <= nearestDistance) {
+            // Leaving a zone re-arms it for the next pass; 3 mi out vs 2 mi in absorbs GPS jitter.
+            if (distance > EXIT_RADIUS_MILES) insideCorridorIds.remove(corridor.id);
+            if (distance > ALERT_RADIUS_MILES) continue;
+            inRange.add(corridor);
+            // Corridors overlap; only the nearest zone we have not already announced gets to speak.
+            if (!insideCorridorIds.contains(corridor.id) && distance <= nearestDistance) {
                 nearest = corridor;
                 nearestDistance = distance;
             }
         }
-        if (nearest != null) maybeAlert(nearest);
-    }
-
-    private void maybeAlert(Corridor corridor) {
+        // Parked or walking inside a zone is not a reason to alert; unknown speed passes.
+        if (location.hasSpeed() && location.getSpeed() < MIN_DRIVING_SPEED_MPS) return;
+        if (nearest == null) return;
         long now = System.currentTimeMillis();
         if (now - lastAlertAt < ALERT_SPACING_MS) return;
-        Long last = lastAlertedAt.get(corridor.id);
-        if (last != null && now - last < ALERT_COOLDOWN_MS) return;
-        lastAlertedAt.put(corridor.id, now);
         lastAlertAt = now;
-        showAlert(corridor);
-        speak(corridor.speech());
+        // One alert covers every overlapping zone the driver is in right now.
+        for (Corridor corridor : inRange) insideCorridorIds.add(corridor.id);
+        speak(nearest.speech());
     }
 
     // Spoken alert: ducks music / navigation while speaking, like a turn-by-turn prompt.
@@ -257,27 +250,6 @@ public class CorridorAlertService extends Service implements LocationListener {
                 .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                 .build();
-    }
-
-    private void showAlert(Corridor corridor) {
-        Intent notificationIntent = new Intent(this, MainActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent,
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_IMMUTABLE : 0);
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ALERT)
-                .setContentTitle("Pause for Paws \u2014 slow down")
-                .setContentText(corridor.notificationBody())
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(corridor.notificationBody()))
-                .setSmallIcon(android.R.drawable.ic_dialog_alert)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .setContentIntent(pendingIntent)
-                .build();
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-                && Build.VERSION.SDK_INT >= 33) {
-            return;
-        }
-        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (manager != null) manager.notify(corridor.id.hashCode(), notification);
     }
 
     @Override

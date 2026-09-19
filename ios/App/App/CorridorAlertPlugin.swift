@@ -11,10 +11,6 @@ public class CorridorAlertPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise)
     ]
 
-    public override func load() {
-        bridge?.notificationRouter.localNotificationHandler = CorridorAlertMonitor.shared
-    }
-
     @objc func start(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             CorridorAlertMonitor.shared.start { error in

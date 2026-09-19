@@ -1,18 +1,17 @@
 import Foundation
 import CoreLocation
-import UserNotifications
 import AVFoundation
-import Capacitor
 
 // iOS counterpart of Android's CorridorAlertService: keeps watching the device location (in the
-// background too) and, when it is near a bundled historical corridor, posts a local notification and
-// speaks the alert so it reaches the driver through CarPlay / Bluetooth car audio.
-final class CorridorAlertMonitor: NSObject, CLLocationManagerDelegate, NotificationHandlerProtocol, AVSpeechSynthesizerDelegate {
+// background too) and speaks a short alert when the driver enters a bundled historical corridor, so
+// it reaches them through CarPlay / Bluetooth car audio. Voice only, by design: no banners.
+final class CorridorAlertMonitor: NSObject, CLLocationManagerDelegate, AVSpeechSynthesizerDelegate {
     static let shared = CorridorAlertMonitor()
 
     private static let alertRadiusMiles = 2.0
-    private static let alertCooldown: TimeInterval = 10 * 60   // per corridor
+    private static let exitRadiusMiles = 3.0                   // re-arm a zone only once clearly past it
     private static let alertSpacing: TimeInterval = 2 * 60     // between any two alerts
+    private static let minDrivingSpeed: CLLocationSpeed = 8.9  // m/s, about 20 mph
     private static let enabledKey = "corridorAlertEnabled"
 
     enum StartError: LocalizedError {
@@ -23,29 +22,23 @@ final class CorridorAlertMonitor: NSObject, CLLocationManagerDelegate, Notificat
     private struct Corridor {
         let id: String
         let species: String   // "animal-crash" for DOT clusters, or a real animal for reported crossings
-        let road: String
-        let count: Int
-        let risk: String
         let location: CLLocation
 
-        // Driver-facing wording shared by the notification and the spoken alert.
+        // Driver-facing wording for the spoken alert.
         var animal: String? {
             let generic = ["animal-crash", "animal-related crashes", "wildlife", ""]
             return generic.contains(species.lowercased()) ? nil : species
         }
-        // Kept short: read at a glance on the lock screen, one breath when spoken.
+        // Kept to one breath so it never competes with the road.
         var headline: String { "\(animal ?? "Wildlife") crossing ahead" }
         var advice: String { animal == nil ? "Watch for deer." : "Watch both sides." }
-        var notificationBody: String {
-            count > 1 ? "\(headline) — \(count) crashes this year. \(advice)" : "\(headline). \(advice)"
-        }
         var speech: String { "Pause for Paws. \(headline). \(advice)" }
     }
 
     private let locationManager = CLLocationManager()
     nonisolated(unsafe) private let speaker = AVSpeechSynthesizer()
     private let corridors: [Corridor]
-    private var lastAlertedAt: [String: Date] = [:]
+    private var insideCorridorIds = Set<String>()
     private var lastAlertAt = Date.distantPast
     private var pendingStart: ((Error?) -> Void)?
     private(set) var isRunning = false
@@ -60,9 +53,7 @@ final class CorridorAlertMonitor: NSObject, CLLocationManagerDelegate, Notificat
     // MARK: - Start / stop
 
     func start(completion: @escaping (Error?) -> Void) {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
-            DispatchQueue.main.async { self.requestLocationThenStart(completion) }
-        }
+        requestLocationThenStart(completion)
     }
 
     func stop() {
@@ -151,40 +142,29 @@ final class CorridorAlertMonitor: NSObject, CLLocationManagerDelegate, Notificat
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
-        // Corridors overlap; only the nearest one gets to speak.
-        let nearby = corridors
-            .map { ($0, location.distance(from: $0.location) / 1609.344) }
-            .filter { $0.1 <= Self.alertRadiusMiles }
-            .min { $0.1 < $1.1 }
-        if let (corridor, _) = nearby { maybeAlert(corridor) }
+        let distances = corridors.map { ($0, location.distance(from: $0.location) / 1609.344) }
+        // Leaving a zone re-arms it for the next pass; 3 mi out vs 2 mi in absorbs GPS jitter.
+        for (corridor, distance) in distances where distance > Self.exitRadiusMiles {
+            insideCorridorIds.remove(corridor.id)
+        }
+        // Parked or walking inside a zone is not a reason to alert; unknown speed (-1) passes.
+        if location.speed >= 0 && location.speed < Self.minDrivingSpeed { return }
+        let inRange = distances.filter { $0.1 <= Self.alertRadiusMiles }
+        // Corridors overlap; only the nearest zone we have not already announced gets to speak.
+        guard let (nearest, _) = inRange.filter({ !insideCorridorIds.contains($0.0.id) }).min(by: { $0.1 < $1.1 }) else { return }
+        let now = Date()
+        if now.timeIntervalSince(lastAlertAt) < Self.alertSpacing { return }
+        lastAlertAt = now
+        // One alert covers every overlapping zone the driver is in right now.
+        inRange.forEach { insideCorridorIds.insert($0.0.id) }
+        speak(nearest.speech)
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // Transient GPS failures are expected while driving; keep watching.
     }
 
-    // MARK: - Alerts
-
-    private func maybeAlert(_ corridor: Corridor) {
-        let now = Date()
-        if now.timeIntervalSince(lastAlertAt) < Self.alertSpacing { return }
-        if let last = lastAlertedAt[corridor.id], now.timeIntervalSince(last) < Self.alertCooldown { return }
-        lastAlertedAt[corridor.id] = now
-        lastAlertAt = now
-        showAlert(corridor)
-    }
-
-    private func showAlert(_ corridor: Corridor) {
-        let content = UNMutableNotificationContent()
-        content.title = "Pause for Paws — slow down"
-        content.body = corridor.notificationBody
-        content.sound = .default
-        let request = UNNotificationRequest(identifier: "corridor-\(corridor.id)", content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
-        speak(corridor.speech)
-    }
-
-    // MARK: - Spoken alert (works over CarPlay and Bluetooth without a CarPlay entitlement)
+    // MARK: - Spoken alert (plays over CarPlay and Bluetooth without a CarPlay entitlement)
 
     private func speak(_ text: String) {
         let session = AVAudioSession.sharedInstance()
@@ -206,17 +186,6 @@ final class CorridorAlertMonitor: NSObject, CLLocationManagerDelegate, Notificat
         speechSynthesizer(synthesizer, didFinish: utterance)
     }
 
-    // MARK: - NotificationHandlerProtocol (lets alerts show as banners while the app is open)
-
-    func willPresent(notification: UNNotification) -> UNNotificationPresentationOptions {
-        if #available(iOS 14.0, *) { return [.banner, .list, .sound] }
-        return [.alert, .sound]
-    }
-
-    func didReceive(response: UNNotificationResponse) {
-        // Tapping the banner just brings the app forward; nothing else to do.
-    }
-
     // MARK: - Data
 
     private static func loadCorridors() -> [Corridor] {
@@ -229,9 +198,6 @@ final class CorridorAlertMonitor: NSObject, CLLocationManagerDelegate, Notificat
             guard let lat = event["lat"] as? Double, let lng = event["lng"] as? Double else { return nil }
             return Corridor(id: event["id"] as? String ?? "corridor-\(index)",
                             species: event["species"] as? String ?? "",
-                            road: event["road"] as? String ?? "",
-                            count: event["count"] as? Int ?? 0,
-                            risk: event["risk"] as? String ?? "",
                             location: CLLocation(latitude: lat, longitude: lng))
         }
     }
