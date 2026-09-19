@@ -7,7 +7,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // iOS relaunches the app in the background for a significant location change; the web view
+        // (and the CorridorAlert plugin) never load in that case, so resume monitoring natively.
+        if launchOptions?[.location] != nil {
+            CorridorAlertMonitor.shared.resumeIfEnabled()
+        }
         return true
     }
 
