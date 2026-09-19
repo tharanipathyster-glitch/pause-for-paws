@@ -13,6 +13,11 @@ import android.content.pm.ServiceInfo;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -28,26 +33,48 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
-// Foreground service: shows an ongoing "monitoring" notification and pops up an alert
-// when the device is near a bundled historical wildlife-collision corridor.
+// Foreground service: shows an ongoing "monitoring" notification and, when the device is near a
+// bundled historical wildlife-collision corridor, posts an alert notification and speaks it so it
+// reaches the driver over Bluetooth / Android Auto car audio. Mirrors the iOS CorridorAlertMonitor.
 public class CorridorAlertService extends Service implements LocationListener {
     public static final String CHANNEL_MONITOR = "pause_for_paws_monitor";
     public static final String CHANNEL_ALERT = "pause_for_paws_alert";
     private static final int MONITOR_NOTIFICATION_ID = 1001;
     private static final double ALERT_RADIUS_MILES = 2.0;
-    private static final long ALERT_COOLDOWN_MS = 10 * 60 * 1000;
+    private static final long ALERT_COOLDOWN_MS = 10 * 60 * 1000; // per corridor
+    private static final long ALERT_SPACING_MS = 2 * 60 * 1000;   // between any two alerts
 
     private LocationManager locationManager;
     private final List<Corridor> corridors = new ArrayList<>();
     private final Map<String, Long> lastAlertedAt = new HashMap<>();
+    private long lastAlertAt = 0;
+    private TextToSpeech tts;
+    private boolean ttsReady = false;
+    private AudioFocusRequest focusRequest;
 
     private static class Corridor {
         String id;
-        String label;
+        String species; // "animal-crash" for DOT clusters, or a real animal for reported crossings
+        int count;
         double lat;
         double lng;
+
+        // Driver-facing wording shared by the notification and the spoken alert. Kept short:
+        // read at a glance on the lock screen, one breath when spoken.
+        String animal() {
+            String s = species == null ? "" : species.trim().toLowerCase(Locale.US);
+            if (s.isEmpty() || s.equals("animal-crash") || s.equals("animal-related crashes") || s.equals("wildlife")) return null;
+            return species.trim();
+        }
+        String headline() { return (animal() == null ? "Wildlife" : animal()) + " crossing ahead"; }
+        String advice() { return animal() == null ? "Watch for deer." : "Watch both sides."; }
+        String notificationBody() {
+            return count > 1 ? headline() + " \u2014 " + count + " crashes this year. " + advice() : headline() + ". " + advice();
+        }
+        String speech() { return "Pause for Paws. " + headline() + ". " + advice(); }
     }
 
     @Override
@@ -57,6 +84,17 @@ public class CorridorAlertService extends Service implements LocationListener {
         loadCorridors();
         startAsForeground();
         startLocationUpdates();
+        tts = new TextToSpeech(this, status -> {
+            ttsReady = status == TextToSpeech.SUCCESS;
+            if (ttsReady) {
+                tts.setAudioAttributes(speechAttributes());
+                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                    @Override public void onStart(String utteranceId) { }
+                    @Override public void onDone(String utteranceId) { abandonAudioFocus(); }
+                    @Override public void onError(String utteranceId) { abandonAudioFocus(); }
+                });
+            }
+        });
     }
 
     @Override
@@ -73,6 +111,10 @@ public class CorridorAlertService extends Service implements LocationListener {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        if (tts != null) {
+            tts.stop();
+            tts.shutdown();
+        }
         if (locationManager != null) {
             try {
                 locationManager.removeUpdates(this);
@@ -108,9 +150,11 @@ public class CorridorAlertService extends Service implements LocationListener {
                 JSONObject event = events.getJSONObject(i);
                 Corridor corridor = new Corridor();
                 corridor.id = event.optString("id", "corridor-" + i);
-                corridor.label = event.optString("species", "Historical wildlife corridor");
+                corridor.species = event.optString("species", "");
+                corridor.count = event.optInt("count", 0);
                 corridor.lat = event.optDouble("lat");
                 corridor.lng = event.optDouble("lng");
+                if (Double.isNaN(corridor.lat) || Double.isNaN(corridor.lng)) continue;
                 corridors.add(corridor);
             }
         } catch (Exception ignored) {
@@ -157,18 +201,62 @@ public class CorridorAlertService extends Service implements LocationListener {
 
     @Override
     public void onLocationChanged(Location location) {
+        // Corridors overlap; only the nearest one gets to speak.
+        Corridor nearest = null;
+        double nearestDistance = ALERT_RADIUS_MILES;
         for (Corridor corridor : corridors) {
             double distance = distanceMiles(location.getLatitude(), location.getLongitude(), corridor.lat, corridor.lng);
-            if (distance <= ALERT_RADIUS_MILES) maybeAlert(corridor);
+            if (distance <= nearestDistance) {
+                nearest = corridor;
+                nearestDistance = distance;
+            }
         }
+        if (nearest != null) maybeAlert(nearest);
     }
 
     private void maybeAlert(Corridor corridor) {
         long now = System.currentTimeMillis();
+        if (now - lastAlertAt < ALERT_SPACING_MS) return;
         Long last = lastAlertedAt.get(corridor.id);
         if (last != null && now - last < ALERT_COOLDOWN_MS) return;
         lastAlertedAt.put(corridor.id, now);
+        lastAlertAt = now;
         showAlert(corridor);
+        speak(corridor.speech());
+    }
+
+    // Spoken alert: ducks music / navigation while speaking, like a turn-by-turn prompt.
+    private void speak(String text) {
+        if (!ttsReady || tts == null) return;
+        AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        if (audioManager != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                        .setAudioAttributes(speechAttributes())
+                        .build();
+                audioManager.requestAudioFocus(focusRequest);
+            } else {
+                audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+            }
+        }
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "corridor-alert");
+    }
+
+    private void abandonAudioFocus() {
+        AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        if (audioManager == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (focusRequest != null) audioManager.abandonAudioFocusRequest(focusRequest);
+        } else {
+            audioManager.abandonAudioFocus(null);
+        }
+    }
+
+    private static AudioAttributes speechAttributes() {
+        return new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build();
     }
 
     private void showAlert(Corridor corridor) {
@@ -176,8 +264,9 @@ public class CorridorAlertService extends Service implements LocationListener {
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_IMMUTABLE : 0);
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ALERT)
-                .setContentTitle("Pause for Paws")
-                .setContentText("Historical " + corridor.label.toLowerCase() + " corridor ahead. Slow down and watch both shoulders.")
+                .setContentTitle("Pause for Paws \u2014 slow down")
+                .setContentText(corridor.notificationBody())
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(corridor.notificationBody()))
                 .setSmallIcon(android.R.drawable.ic_dialog_alert)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
