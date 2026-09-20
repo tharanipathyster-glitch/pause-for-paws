@@ -78,3 +78,7 @@ Waze and Google Maps availability, incident rendering, feed latency, and eligibi
 ## Patent and legal posture
 
 No one can guarantee that a product does not conflict with existing patents without a jurisdiction-specific professional freedom-to-operate search. The distinctive product framing here is a corridor-state publication layer: it aggregates short-lived point detections into transparent, expiring corridor risk states and keeps real-time per-animal alerts on first-party roadside or app channels. Before commercialization, have patent counsel search relevant claims and review data licenses, privacy, safety claims, trademarks, and partner terms.
+
+## Installing on phones and iPads
+
+See [INSTALL-ON-DEVICE.md](INSTALL-ON-DEVICE.md) for the click-by-click Xcode and Android Studio steps, the one-time device settings (Developer Mode, trusting the developer), and how to refresh the 7-day free-account installs.
