@@ -52,7 +52,28 @@ is required to request the CarPlay entitlement.
 
 ## Android
 
-On any PC with Android Studio:
+### Before you start (once per PC)
+
+1. **Android Studio** is installed (bundles the JDK and Android SDK).
+2. The **Google USB Driver** is installed: Android Studio → **Tools → SDK
+   Manager → SDK Tools** tab → check **Google USB Driver** → **Apply**.
+   Without this, Windows will show the phone as an unrecognized/"Unknown"
+   device and nothing below will work, no matter what's toggled on the phone.
+3. The Google Maps key file `google-maps-config.js` exists in the project
+   folder **and** in `www/google-maps-config.js` (it is deliberately *not*
+   on GitHub; copy it from another machine that has it, or ask for the key).
+
+### On the phone (once per device)
+
+1. **Settings → About phone → tap "Build number" 7 times** to unlock
+   Developer Options.
+2. **Settings → System → Developer options → USB debugging** → on.
+3. Plug the phone into the PC with a cable, **unlocked**.
+4. A popup appears on the phone: **"Allow USB debugging?"** → check
+   **"Always allow from this computer"** → **Allow**. If no popup appears,
+   see Troubleshooting below.
+
+### Build and install (every time)
 
 ```bash
 git pull
@@ -61,8 +82,25 @@ npm run android:sync
 npm run android:open
 ```
 
-Then plug the phone in (USB debugging on) and press **▶ Run** in Android
-Studio.
+Then in Android Studio, pick the connected device from the device dropdown
+in the toolbar and press **▶ Run**. First build takes a few minutes.
+
+**Command-line alternative** (no Android Studio UI needed, useful for a
+quick reinstall): from the `android/` folder run
+`./gradlew.bat assembleDebug`, then install the result with
+`adb install -r app/build/outputs/apk/debug/app-debug.apk`
+(`adb` is in the SDK's `platform-tools` folder).
+
+### Troubleshooting
+
+| Symptom | What to do |
+|---|---|
+| Windows Device Manager shows the phone as "Unknown" / no driver | Install the **Google USB Driver** (see above), then in Device Manager right-click the device → **Update driver** → **Browse my computer for drivers** → point to `<Android SDK>\extras\google\usb_driver`. |
+| Windows notification: **"USB device malfunctioned"** | This is a cable/port issue, not software — no driver fixes it. Try a different USB-C cable (charge-only cables are a common cause) and a different port, ideally a rear/motherboard USB port rather than a hub. |
+| `adb devices` shows nothing at all | Restart the adb server: `adb kill-server && adb start-server`, then reconnect. Confirm the phone is **unlocked** — the debugging popup often won't show on a locked screen. |
+| `adb devices` shows the device but "unauthorized" | The on-phone "Allow USB debugging?" popup hasn't been accepted yet, or was previously revoked — check the phone screen, or **Developer options → Revoke USB debugging authorizations** then reconnect to force the prompt again. |
+| Gradle build fails with an SSL/PKIX certificate error | Usually antivirus software (e.g. Norton) intercepting HTTPS with its own certificate, which the JDK doesn't trust even though Windows does. Fix is per-machine; ask for help rather than disabling antivirus protection. |
+| Map is blank | `google-maps-config.js` is missing from the project root **and/or** `www/` (see "Before you start"). |
 
 ## Troubleshooting
 
