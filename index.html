@@ -30,12 +30,12 @@
         <div>
           <p class="eyebrow">Iowa / vehicle–animal crash corridors</p>
           <h1>Slow down.<br><em>This is where it keeps happening.</em></h1>
-          <p class="hero-copy">We are a student robotics team in Waukee, Iowa. We take the state's own crash records, updated twice a month, and group them into the stretches of road where drivers keep hitting animals — so you can check your route before you drive it.</p>
+          <p class="hero-copy">We are a student robotics team in Waukee, Iowa. We take the state's own crash records, updated twice a month, and group them into the stretches of road where drivers keep hitting animals — so you can check your route before you drive it, and so road project designers can see exactly where a fix like fencing or a crossing structure would do the most good.</p>
         </div>
         <div class="hero-meta">
           <span class="meta-label">What this is</span>
-          <strong>A pattern, not a tracker</strong>
-          <span>Built from crashes already reported to Iowa DOT. We cannot tell you an animal is in the road right now.</span>
+          <strong>A pattern drivers can check, and planners can act on</strong>
+          <span>Built from crashes already reported to Iowa DOT. We cannot tell you an animal is in the road right now — but we can tell you, and Iowa DOT, exactly where the pattern is worst.</span>
         </div>
       </section>
 
@@ -135,6 +135,81 @@
             <p>It shows a pattern from the past. It cannot tell you an animal is there right now, it cannot tell you which animal, and it only contains crashes someone reported to police. Research on <em>deer</em> crashes suggests about 40% are never reported, so the real totals are higher than these. Iowa DOT adds crashes as reports come in, so the last few weeks are always incomplete.</p>
           </div>
         </div>
+      </section>
+
+      <section class="corridor-section" id="advocacy">
+        <div class="section-heading">
+          <div><span class="kicker">What we're doing with this</span><h2>Making the case for the fix that actually works</h2></div>
+        </div>
+        <div class="method-grid two-col">
+          <div class="method">
+            <span class="kicker">What the research says works</span>
+            <p>Wildlife fencing combined with underpasses or overpasses reduces collisions with large mammals by 80–100% when built together. Fencing alone just displaces the problem to where the fence ends; crossing structures alone, without fencing, don't reduce collisions at all. Structures have to be sized and placed for the species that actually needs them.</p>
+          </div>
+          <div class="method">
+            <span class="kicker">What we're not pretending an app can do</span>
+            <p>A phone alert can raise awareness. It won't reliably make drivers slow down in a high-risk zone, and pushing people to slow down without changing the road can backfire — mixing fast and slow traffic on the same two-lane road raises the risk of head-on collisions from impatient passing.</p>
+          </div>
+        </div>
+        <div class="cta-row">
+          <a class="primary-button" href="dot-brief.html">Read the brief we're taking to Iowa DOT →</a>
+          <span class="report-copy small">Corridor data plus the evidence above, packaged as a one-page case for an engineering study — not a consumer warning.</span>
+        </div>
+      </section>
+
+      <section class="corridor-section" id="cost">
+        <div class="section-heading">
+          <div><span class="kicker">Cost, compared</span><h2>What fixing this would actually cost</h2></div>
+          <span class="mono" id="costCount">—</span>
+        </div>
+        <p class="report-copy">Fencing has to be paired with a crossing structure — a fence alone just blocks animals rather than getting them across safely. Below, we compare that against a red, high-friction road surface, at different lengths of coverage and four grit options — the cheaper alternatives make this kind of fix realistic at more corridors, faster.</p>
+        <div class="method-grid">
+          <div class="method">
+            <span class="kicker">Calcined bauxite</span>
+            <p>Bauxite ore baked at 1,000–1,500°C for hardness. Imported. FHWA's reference material for high-friction surfacing — installed at thousands of curve and ramp sites nationwide since the 2010s.</p>
+          </div>
+          <div class="method">
+            <span class="kicker">Taconite</span>
+            <p>Leftover rock from Minnesota's iron mines. Being field-tested by MnDOT right now on real low-volume roads near Duluth as a bauxite substitute — about 6% less grip, no faster wear over time.</p>
+          </div>
+          <div class="method">
+            <span class="kicker">Steel slag</span>
+            <p>A byproduct of steel manufacturing. Tested as a friction-surface aggregate at the National Center for Asphalt Technology's track and in Indiana DOT-funded research.</p>
+          </div>
+          <div class="method">
+            <span class="kicker">Flint chat</span>
+            <p>Leftover chert gravel from old lead-zinc mining in the Missouri–Oklahoma–Kansas tri-state district. Tested as a friction-surface aggregate in Oklahoma DOT-funded research.</p>
+          </div>
+        </div>
+        <p class="data-note">Bauxite's $25–35/sq yd is a real, commercial state-DOT price. The other three don't have a published commercial price yet — still pilot-stage — so they share one conservative estimate below, marked *.</p>
+        <div class="picker-row">
+          <div class="material-picker" id="coveragePicker" role="radiogroup" aria-label="Red surface coverage"></div>
+        </div>
+        <div class="cost-table-wrap">
+          <table class="cost-table" id="costTable">
+            <thead>
+              <tr>
+                <th>Corridor</th><th>Crashes</th><th>Risk</th><th>Fence length</th>
+                <th>Fencing<span class="th-note">both sides</span></th>
+                <th>+ 1 underpass</th>
+                <th>Bauxite<span class="th-note" id="covNote1">red surface, sourced price</span></th>
+                <th>Taconite<span class="th-note" id="covNote2">red surface, estimate</span></th>
+                <th>Steel slag<span class="th-note" id="covNote3">red surface, estimate</span></th>
+                <th>Flint chat<span class="th-note" id="covNote4">red surface, estimate</span></th>
+              </tr>
+            </thead>
+            <tbody id="costTableBody"></tbody>
+          </table>
+        </div>
+        <p class="data-note" id="costNote">Live-computed from the same corridor data as the map above, using: 8-ft wildlife fencing at $40K–$80K/mile (one side to both sides, U.S. game-fence contractor pricing, not a DOT bid); a mid-size culvert-style underpass at $500K–$2M (a multi-lane overpass runs $5M–$15M+ and is usually only needed for elk/moose-scale species — Iowa's crashes are almost entirely white-tailed deer). All estimates are a starting point for a feasibility study, not a bid — real costs need a site survey.</p>
+      </section>
+
+      <section class="corridor-section" id="research">
+        <div class="section-heading">
+          <div><span class="kicker">Where this comes from</span><h2>We talked to a road ecologist. It changed the plan.</h2></div>
+        </div>
+        <p class="report-copy">In September 2026 we spoke with <b>Marcel Huijser</b>, a road ecologist who has spent decades researching wildlife-vehicle collisions and the measures that reduce them — fencing, crossing structures, and the economics of building them — for transportation agencies across the US. He's also the person who told us static warning signs, and even location-specific alerts like the one this site can show, don't reliably reduce collisions on their own.</p>
+        <p class="report-copy">His publications, including the fencing and crossing-structure research behind the numbers on this page, are online: <a href="https://www.mphetc.com/publications" target="_blank" rel="noopener">mphetc.com/publications</a>.</p>
       </section>
     </main>
 

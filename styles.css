@@ -180,3 +180,36 @@ a.primary-button { text-decoration: none; }
 .month-bar { max-width: none; }
 /* phone app: keep the header clear of the status bar */
 body.native .topbar { padding-top: 40px; }
+
+/* two-track / advocacy / research sections (2026-09-23) */
+.method-grid.two-col { grid-template-columns: repeat(2, 1fr); }
+.tag-inline { margin-left: 8px; text-transform: none; letter-spacing: normal; }
+.cta-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 16px; }
+#research .report-copy, #advocacy .report-copy { margin-bottom: 12px; }
+#research .report-copy a { color: var(--green); font-weight: 600; }
+@media (max-width: 850px) {
+  .method-grid.two-col { grid-template-columns: 1fr; }
+}
+
+/* cost-comparison table (2026-09-26) */
+.cost-table-wrap { overflow-x: auto; border: 1px solid var(--line); }
+.cost-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+.cost-table th, .cost-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+.cost-table thead th { font: 10px var(--mono); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); background: var(--paper); }
+.cost-table .th-note { display: block; font-weight: 400; text-transform: none; letter-spacing: normal; color: var(--muted); font-size: 9px; margin-top: 2px; }
+.cost-table tbody tr:last-child td { border-bottom: 0; }
+.cost-table tbody tr:hover { background: var(--paper); }
+.cost-table td.id-cell strong { color: var(--ink); }
+.cost-table td.id-cell span { display: block; color: var(--muted); font-size: 10px; }
+.cost-table td.risk-highest { color: var(--coral); }
+.cost-table td.risk-elevated { color: var(--green); }
+.cost-table td.num { font-family: var(--mono); }
+.cost-table td.cheaper { background: rgba(36,92,67,.12); color: var(--green); font-weight: 600; }
+.cheap-tag { display: block; font-family: var(--mono); font-weight: 400; text-transform: uppercase; letter-spacing: .03em; font-size: 8px; color: var(--green); margin-top: 2px; }
+
+.material-picker { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 18px; }
+.material-pill { background: var(--panel); color: var(--green); border: 1px solid var(--line); padding: 9px 14px; font: 10px var(--mono); text-transform: uppercase; letter-spacing: .05em; cursor: pointer; text-align: left; line-height: 1.5; }
+.material-pill span { display: block; color: var(--muted); text-transform: none; letter-spacing: normal; font-size: 9px; margin-top: 2px; }
+.material-pill:hover { border-color: var(--green); }
+.material-pill.active { background: var(--green); border-color: var(--green); color: white; }
+.material-pill.active span { color: #cfe3d3; }

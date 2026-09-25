@@ -104,6 +104,8 @@ function setYear(next) {
   renderMonthPicker();
   renderDayChart();
   renderWeekdayStrip();
+  renderCoveragePicker();
+  renderCostTable();
   document.querySelectorAll(".period-label").forEach((el) => { el.textContent = periodLabel(); });
   setView(view);
 }
@@ -324,6 +326,95 @@ function renderCorridorList(list, label) {
     $("#corridorList").insertAdjacentHTML("beforeend",
       `<p class="empty-state">Showing the ${LIST_LIMIT} worst of ${list.length.toLocaleString()} corridors. Enter a ZIP code to see the ones near you.</p>`);
   }
+}
+
+/* ---------- cost comparison table ---------- */
+
+const COST_LIMIT = 12;
+const FENCE_PER_MI = [40000, 80000];       // 8-ft wildlife fencing, one side to both sides
+const UNDERPASS = [500000, 2000000];       // mid-size culvert-style crossing structure
+const ROAD_WIDTH_YD = 24 / 3;              // typical 2-lane rural highway, in yards
+
+/* Red-surface grit options. Bauxite's $25-35/sq yd is a sourced, commercial DOT figure.
+   The three alternatives have no published market price yet (still pilot-stage research),
+   so they share one conservative estimated range rather than three invented, different ones. */
+const MATERIALS = [
+  { key: "bauxite", label: "Calcined bauxite", rate: [25, 35], sourced: true },
+  { key: "taconite", label: "Taconite", rate: [18, 26], sourced: false },
+  { key: "slag", label: "Steel slag", rate: [18, 26], sourced: false },
+  { key: "chat", label: "Flint chat", rate: [18, 26], sourced: false },
+];
+
+const COVERAGE_OPTIONS = [
+  { key: 100, label: "100% coverage", sub: "solid ribbon, full length" },
+  { key: 50, label: "50% coverage", sub: "patchy, half the length" },
+  { key: 25, label: "25% coverage", sub: "patchy, a quarter of the length" },
+  { key: 10, label: "10% coverage", sub: "patchy, a tenth of the length" },
+];
+let coverage = 100;
+
+function formatUsd(n) {
+  if (n >= 1000000) return `$${(n / 1000000).toFixed(n % 1000000 === 0 ? 0 : 1)}M`;
+  return `$${Math.round(n / 1000)}K`;
+}
+
+function formatRange(low, high) {
+  return `${formatUsd(low)}–${formatUsd(high)}`;
+}
+
+function renderCoveragePicker() {
+  const picker = $("#coveragePicker");
+  if (!picker) return;
+  picker.innerHTML = COVERAGE_OPTIONS.map((o) => `
+    <button class="material-pill${o.key === coverage ? " active" : ""}" data-coverage="${o.key}" role="radio" aria-checked="${o.key === coverage}">
+      ${o.label}<span>${o.sub}</span>
+    </button>`).join("");
+  picker.querySelectorAll(".material-pill").forEach((button) => {
+    button.addEventListener("click", () => { coverage = Number(button.dataset.coverage); renderCoveragePicker(); renderCostTable(); });
+  });
+}
+
+function renderCostTable() {
+  const body = $("#costTableBody");
+  if (!body) return;
+  const frac = coverage / 100;
+  MATERIALS.forEach((m, i) => {
+    $(`#covNote${i + 1}`).textContent = coverage === 100
+      ? (m.sourced ? "sourced price, full length" : "estimate, full length")
+      : `${m.sourced ? "sourced price" : "estimate"}, ${coverage}% coverage`;
+  });
+  const rows = DATA.corridors
+    .filter((c) => c.fenceLengthMi != null && c.risk !== "Monitored")
+    .slice(0, COST_LIMIT);
+  $("#costCount").textContent = `${rows.length} highest-risk corridors`;
+  body.innerHTML = rows.length ? rows.map((c) => {
+    const mi = c.fenceLengthMi;
+    const fenceLow = mi * FENCE_PER_MI[0], fenceHigh = mi * FENCE_PER_MI[1];
+    const underLow = fenceLow + UNDERPASS[0], underHigh = fenceHigh + UNDERPASS[1];
+    const sqyd = mi * 1760 * ROAD_WIDTH_YD * frac;
+    const riskClass = c.risk === "Highest" ? "risk-highest" : c.risk === "Elevated" ? "risk-elevated" : "";
+    const materialCells = MATERIALS.map((m) => {
+      const low = sqyd * m.rate[0], high = sqyd * m.rate[1];
+      // "Cheaper" only when the surface's worst case still beats fencing+underpass's best case —
+      // true across the whole estimated range on both sides, not just on a lucky pick of numbers.
+      const cheaper = high < underLow;
+      return `<td class="num${cheaper ? " cheaper" : ""}">${formatRange(low, high)}${!m.sourced ? " *" : ""}${cheaper ? `<span class="cheap-tag">&darr; cheaper than fencing</span>` : ""}</td>`;
+    }).join("");
+    return `
+      <tr>
+        <td class="id-cell"><strong>${c.id}</strong><span>${c.lat.toFixed(3)}, ${c.lng.toFixed(3)}</span></td>
+        <td class="num">${c.crashes}</td>
+        <td class="${riskClass}">${c.risk}</td>
+        <td class="num">${mi.toFixed(1)} mi</td>
+        <td class="num">${formatRange(fenceLow, fenceHigh)}</td>
+        <td class="num">${formatRange(underLow, underHigh)}</td>
+        ${materialCells}
+      </tr>`;
+  }).join("") : `<tr><td colspan="10" class="empty-state">Corridor data did not load.</td></tr>`;
+  const coverageNote = coverage === 100
+    ? "applied as a solid ribbon the full length of the corridor"
+    : `spread as patchy, rumble-strip-style coverage across ${coverage}% of the corridor's length (a what-if, not a validated spec)`;
+  $("#costNote").innerHTML = `Live-computed from the same corridor data as the map above, using: 8-ft wildlife fencing at $40K&ndash;$80K/mile (one side to both sides, U.S. game-fence contractor pricing, not a DOT bid); a mid-size culvert-style underpass at $500K&ndash;$2M (a multi-lane overpass runs $5M&ndash;$15M+ and is usually only needed for elk/moose-scale species &mdash; Iowa's crashes are almost entirely white-tailed deer); and red surface treatment, ${coverageNote}, at calcined bauxite's sourced $25&ndash;35/sq yd versus taconite/steel slag/flint chat's shared estimated $18&ndash;26/sq yd (marked *, not yet a commercial price). <span class="cheap-tag" style="display:inline;">&darr; cheaper than fencing</span> marks a surface option that beats fencing + underpass on cost even in the worst case for the surface and the best case for fencing &mdash; a cost comparison only. It's still just a road surface: it never gets an animal to the other side, no matter how cheap. All estimates are a starting point for a feasibility study, not a bid &mdash; real costs need a site survey.`;
 }
 
 /* ---------- ZIP code search ---------- */
