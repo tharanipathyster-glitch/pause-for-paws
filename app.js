@@ -697,11 +697,23 @@ fetch("iowa-zips.json")
   .then((zips) => { ZIPS = zips; if ($("#corridorSearch").value) runSearch($("#corridorSearch").value); })
   .catch(() => { ZIPS = null; });
 
-fetch("corridors.json")
-  .then((response) => {
-    if (!response.ok) throw new Error("corridors.json not found");
-    return response.json();
-  })
+/* Installed apps bundle corridors.json at build time, so it goes stale until
+   the next reinstall. Try the live site first so the app picks up new Iowa
+   data without a reinstall; fall back to the bundled copy when offline or
+   unreachable. The website itself just fetches its own same-origin copy. */
+async function fetchCorridorData() {
+  if (isNativeApp) {
+    try {
+      const response = await fetch("https://pauseforpawsusa.org/corridors.json", { cache: "no-store", signal: AbortSignal.timeout(5000) });
+      if (response.ok) return response.json();
+    } catch (error) { /* offline or unreachable; fall back to the bundled copy below */ }
+  }
+  const response = await fetch("corridors.json");
+  if (!response.ok) throw new Error("corridors.json not found");
+  return response.json();
+}
+
+fetchCorridorData()
   .then((data) => {
     ALL = data;
     setYear(data.defaultYear);
