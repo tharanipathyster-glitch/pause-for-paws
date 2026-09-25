@@ -149,6 +149,31 @@ def cluster(points):
     return clusters
 
 
+FENCE_BUFFER_KM = 0.8  # InTrans's cited rule: fence ~1/2 mile (0.8 km) past the hotspot edge, each end
+
+
+def fence_length_mi(cluster_lat, cluster_lng, pts):
+    """Suggested fencing length: the crash points' spread along their principal axis,
+    plus a half-mile buffer past each end (see the InTrans Deer-Vehicle Crash
+    Countermeasure Toolbox on fencing ends losing animals around them)."""
+    if len(pts) < 2:
+        span_km = 0.0
+    else:
+        coords = [((p["lng"] - cluster_lng) * LAT_KM * math.cos(math.radians(cluster_lat)),
+                   (p["lat"] - cluster_lat) * LAT_KM) for p in pts]
+        mx = sum(x for x, y in coords) / len(coords)
+        my = sum(y for x, y in coords) / len(coords)
+        cxx = sum((x - mx) ** 2 for x, y in coords) / len(coords)
+        cyy = sum((y - my) ** 2 for x, y in coords) / len(coords)
+        cxy = sum((x - mx) * (y - my) for x, y in coords) / len(coords)
+        theta = 0.5 * math.atan2(2 * cxy, cxx - cyy) if (cxx != cyy or cxy != 0) else 0.0
+        ux, uy = math.cos(theta), math.sin(theta)
+        proj = [(x - mx) * ux + (y - my) * uy for x, y in coords]
+        span_km = max(proj) - min(proj)
+    fence_km = max(span_km, 0.3) + 2 * FENCE_BUFFER_KM
+    return round(fence_km * 0.621371, 2)
+
+
 def is_injury(sev):
     return "Injury" in sev or "Fatal" in sev
 
@@ -201,6 +226,7 @@ def summarize(clusters, prefix, limit=None, min_crashes=1):
             "crashes": n,
             "injuryOrWorse": injury,
             "risk": "Highest" if n >= 12 else "Elevated" if n >= 5 else "Monitored",
+            "fenceLengthMi": fence_length_mi(c["lat"], c["lng"], c["pts"]),
         })
         if limit and len(out) >= limit:
             break

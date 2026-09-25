@@ -41,7 +41,7 @@ jobs:
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
           mkdir -p dist
-          cp index.html app.js styles.css privacy-policy.html corridors.json iowa-zips.json dist/
+          cp index.html app.js styles.css privacy-policy.html corridors.json iowa-zips.json dot-brief.html dist/
           echo "window.GOOGLE_MAPS_API_KEY = \"$GOOGLE_MAPS_API_KEY\";" > dist/google-maps-config.js
           # Cache-busting: stamp every asset URL with this commit so browsers never keep an old app.js
           V="${GITHUB_SHA::10}"
