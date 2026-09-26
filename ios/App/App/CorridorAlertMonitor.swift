@@ -31,7 +31,10 @@ final class CorridorAlertMonitor: NSObject, CLLocationManagerDelegate, AVSpeechS
         }
         // Kept to one breath so it never competes with the road.
         var headline: String { "\(animal ?? "Wildlife") crossing ahead" }
-        var advice: String { animal == nil ? "Watch for deer." : "Watch both sides." }
+        // Iowa DOT records that an animal was hit, not which animal, so the advice stays
+        // species-neutral. Naming a species we cannot know would contradict our own
+        // methodology page ("we count animal crashes, not deer crashes").
+        var advice: String { "Watch both shoulders." }
         var speech: String { "Pause for Paws. \(headline). \(advice)" }
     }
 

@@ -68,7 +68,10 @@ public class CorridorAlertService extends Service implements LocationListener {
             return species.trim();
         }
         String headline() { return (animal() == null ? "Wildlife" : animal()) + " crossing ahead"; }
-        String advice() { return animal() == null ? "Watch for deer." : "Watch both sides."; }
+        // Iowa DOT records that an animal was hit, not which animal, so the advice stays
+        // species-neutral. Naming a species we cannot know would contradict our own
+        // methodology page ("we count animal crashes, not deer crashes").
+        String advice() { return "Watch both shoulders."; }
         String speech() { return "Pause for Paws. " + headline() + ". " + advice(); }
     }
 
