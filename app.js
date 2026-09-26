@@ -688,8 +688,53 @@ $("#closePopup").addEventListener("click", () => $("#approachPopup").classList.r
 /* Inside the phone app: start the native background alert service and use location straight away. */
 const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 if (isNativeApp) document.body.classList.add("native");
-if (isNativeApp && window.Capacitor.Plugins && window.Capacitor.Plugins.CorridorAlert) {
-  window.Capacitor.Plugins.CorridorAlert.start().catch(() => undefined);
+
+/* Drivers asked in testing for a way to silence alerts without uninstalling, so the switch
+   below drives the native service. The native side persists its own enabled flag (and honours
+   it when iOS relaunches the app in the background), and we assert our stored choice on every
+   boot so the two can never drift apart. Defaults to on for a first install. */
+const ALERTS_KEY = "corridorAlertsEnabled";
+const corridorAlertPlugin = isNativeApp && window.Capacitor.Plugins ? window.Capacitor.Plugins.CorridorAlert : null;
+
+function alertsPreferred() {
+  try { return window.localStorage.getItem(ALERTS_KEY) !== "off"; } catch (error) { return true; }
+}
+
+function renderAlertSwitch(on, detail) {
+  const toggle = $("#alertToggle");
+  const button = $("#alertSwitch");
+  if (!toggle || !button) return;
+  button.setAttribute("aria-checked", on ? "true" : "false");
+  toggle.classList.toggle("is-off", !on);
+  $("#alertToggleState").textContent = detail
+    || (on ? "Voice alerts on while you drive" : "Alerts are off \u2014 no voice warnings");
+}
+
+async function applyAlertPreference(on, { announce = false } = {}) {
+  try { window.localStorage.setItem(ALERTS_KEY, on ? "on" : "off"); } catch (error) { /* private mode */ }
+  renderAlertSwitch(on);
+  if (!corridorAlertPlugin) return;
+  const button = $("#alertSwitch");
+  if (button) button.disabled = true;
+  try {
+    await (on ? corridorAlertPlugin.start() : corridorAlertPlugin.stop());
+    if (announce) showToast(on ? "Corridor alerts on" : "Corridor alerts off");
+  } catch (error) {
+    /* Usually location permission was denied; reflect reality rather than claiming it is on. */
+    try { window.localStorage.setItem(ALERTS_KEY, "off"); } catch (ignored) { /* private mode */ }
+    renderAlertSwitch(false, "Needs location access \u2014 turn it on in Settings");
+    if (announce) showToast("Allow location in Settings to get alerts");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+if (isNativeApp) {
+  renderAlertSwitch(alertsPreferred());
+  $("#alertSwitch").addEventListener("click", () => {
+    applyAlertPreference($("#alertSwitch").getAttribute("aria-checked") !== "true", { announce: true });
+  });
+  applyAlertPreference(alertsPreferred());
 }
 
 fetch("iowa-zips.json")

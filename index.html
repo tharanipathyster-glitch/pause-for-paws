@@ -22,6 +22,14 @@
     </header>
 
     <main id="top">
+      <!-- Phone app only: let the driver silence voice alerts without uninstalling. -->
+      <div class="alert-toggle" id="alertToggle">
+        <div class="alert-toggle-text">
+          <strong>Corridor alerts</strong>
+          <span id="alertToggleState">Checking…</span>
+        </div>
+        <button type="button" class="switch" id="alertSwitch" role="switch" aria-checked="true" aria-label="Corridor voice alerts"><span class="switch-knob"></span></button>
+      </div>
       <div class="legal-banner">
         <strong>Historical pattern notice:</strong> This site shows where animal-related crashes were recorded in the past. It is not live animal tracking and cannot tell you an animal is on the road right now. Driver messages are advisory only.
         <a href="privacy-policy.html">Privacy policy &amp; disclaimer</a>
