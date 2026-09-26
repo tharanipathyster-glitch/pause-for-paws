@@ -2,7 +2,9 @@ package com.pauseforpaws.app;
 
 import android.Manifest;
 import android.content.Intent;
+import android.media.AudioAttributes;
 import android.os.Build;
+import android.speech.tts.TextToSpeech;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
@@ -21,6 +23,44 @@ import com.getcapacitor.annotation.PermissionCallback;
     }
 )
 public class CorridorAlertPlugin extends Plugin {
+
+    /** Plays a real alert on demand so a driver can check car-audio volume before setting off,
+     *  and a store reviewer can hear the feature without standing next to an Iowa corridor.
+     *  Uses its own TextToSpeech rather than the service's, so it works even when alerts are
+     *  switched off and the service is not running. */
+    private static final String TEST_TEXT =
+            "Pause for Paws. This is a test alert. Wildlife crossing ahead. Watch both shoulders.";
+    private TextToSpeech testTts;
+
+    @PluginMethod
+    public void test(PluginCall call) {
+        if (testTts == null) {
+            testTts = new TextToSpeech(getContext(), status -> {
+                if (status == TextToSpeech.SUCCESS) {
+                    testTts.setAudioAttributes(new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build());
+                    testTts.speak(TEST_TEXT, TextToSpeech.QUEUE_FLUSH, null, "corridor-test");
+                }
+            });
+        } else {
+            testTts.speak(TEST_TEXT, TextToSpeech.QUEUE_FLUSH, null, "corridor-test");
+        }
+        JSObject result = new JSObject();
+        result.put("played", true);
+        call.resolve(result);
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        if (testTts != null) {
+            testTts.stop();
+            testTts.shutdown();
+            testTts = null;
+        }
+        super.handleOnDestroy();
+    }
 
     @PluginMethod
     public void start(PluginCall call) {

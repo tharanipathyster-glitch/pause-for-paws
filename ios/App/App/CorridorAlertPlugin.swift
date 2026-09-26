@@ -8,7 +8,8 @@ public class CorridorAlertPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "CorridorAlert"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "test", returnType: CAPPluginReturnPromise)
     ]
 
     @objc func start(_ call: CAPPluginCall) {
@@ -27,6 +28,13 @@ public class CorridorAlertPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             CorridorAlertMonitor.shared.stop()
             call.resolve(["running": false])
+        }
+    }
+
+    @objc func test(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            CorridorAlertMonitor.shared.playTestAlert()
+            call.resolve(["played": true])
         }
     }
 }

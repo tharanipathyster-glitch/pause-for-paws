@@ -167,6 +167,14 @@ final class CorridorAlertMonitor: NSObject, CLLocationManagerDelegate, AVSpeechS
         // Transient GPS failures are expected while driving; keep watching.
     }
 
+    /// Plays a real alert on demand, through the same audio path a live alert uses, so a driver
+    /// can check car-audio volume before setting off and App Review can hear the native feature
+    /// without standing next to an Iowa corridor. Deliberately independent of location permission
+    /// and of the on/off switch, so it works even in a fresh install that has granted nothing.
+    func playTestAlert() {
+        speak("Pause for Paws. This is a test alert. Wildlife crossing ahead. Watch both shoulders.")
+    }
+
     // MARK: - Spoken alert (plays over CarPlay and Bluetooth without a CarPlay entitlement)
 
     private func speak(_ text: String) {

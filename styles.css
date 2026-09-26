@@ -243,3 +243,14 @@ body.native .alert-toggle.is-off .alert-toggle-text span { color: #b7bdb9; }
 .switch[aria-checked="true"] .switch-knob { transform: translateX(26px); }
 .switch:disabled { opacity: .5; }
 
+/* "Play a test alert" — lets a driver check car-audio volume before setting off, and lets an
+   app-store reviewer hear the feature without driving to Iowa. */
+.alert-test {
+  justify-self: start; margin-top: 7px; padding: 7px 11px;
+  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.4); border-radius: 3px;
+  color: #edf2e8; font: 10px var(--mono); text-transform: uppercase; letter-spacing: .05em;
+  cursor: pointer; transition: background .2s ease;
+}
+.alert-test:hover { background: rgba(255,255,255,.24); }
+.alert-test:disabled { opacity: .55; }
+

@@ -729,7 +729,29 @@ async function applyAlertPreference(on, { announce = false } = {}) {
   }
 }
 
+/* Plays a real alert through the native speech path. Works whether the switch is on or off, and
+   without location permission, so it doubles as a volume check and as something a store reviewer
+   can actually hear. Older installs may not have the native method yet, so it is feature-detected. */
+async function playTestAlert() {
+  const button = $("#alertTest");
+  if (!corridorAlertPlugin || typeof corridorAlertPlugin.test !== "function") {
+    showToast("Test alert needs the latest app version");
+    return;
+  }
+  if (button) { button.disabled = true; button.textContent = "\u25b6 Playing\u2026"; }
+  try {
+    await corridorAlertPlugin.test();
+  } catch (error) {
+    showToast("Could not play the test alert");
+  } finally {
+    setTimeout(() => {
+      if (button) { button.disabled = false; button.textContent = "\u25b6 Play a test alert"; }
+    }, 3500);
+  }
+}
+
 if (isNativeApp) {
+  $("#alertTest").addEventListener("click", playTestAlert);
   renderAlertSwitch(alertsPreferred());
   $("#alertSwitch").addEventListener("click", () => {
     applyAlertPreference($("#alertSwitch").getAttribute("aria-checked") !== "true", { announce: true });
