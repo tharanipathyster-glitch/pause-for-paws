@@ -1,6 +1,6 @@
 {
-  "updatedAt": "2026-09-15T02:04:46Z",
-  "expiresAt": "2027-01-12T00:00:00Z",
+  "updatedAt": "2026-10-02T07:35:45Z",
+  "expiresAt": "2027-01-30T00:00:00Z",
   "source": "Iowa DOT Crash Data feature service (Traffic_Safety/Crash_Data), crashes whose major cause is Animal",
   "dataType": "historical",
   "totalCount": 4133,
@@ -2992,18 +2992,6 @@
       "road": "Corridor IA097, 12 crashes in 2025",
       "count": 12,
       "risk": "Highest"
-    },
-    {
-      "id": "R-001",
-      "name": "SE Florence Dr and SE Esker Ridge Dr, Waukee",
-      "lat": 41.5811505,
-      "lng": -93.8617349,
-      "species": "Coyote",
-      "confidence": 0.8,
-      "reportedAt": "2026-01-01T00:00:00Z",
-      "road": "SE Florence Dr and SE Esker Ridge Dr, Waukee",
-      "count": 1,
-      "risk": "Monitored"
     }
   ]
 }

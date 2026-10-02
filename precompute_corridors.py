@@ -27,10 +27,9 @@ SEVERITY = {1: "Fatal Crash", 2: "Suspected Serious Injury Crash", 3: "Suspected
             4: "Possible/Unknown Injury Crash", 5: "Property Damage Only"}
 
 # Reviewed reports sent in by drivers (not in the DOT file). Keep this list short and verified.
-USER_REPORTS = [
-    {"id": "R-001", "lat": 41.5811505, "lng": -93.8617349, "species": "Coyote",
-     "road": "SE Florence Dr and SE Esker Ridge Dr, Waukee", "reportedOn": "2026-09-06"},
-]
+# R-001 (a single coyote sighting in Waukee, 2026-09-06) was removed: the apps alert within
+# 2 miles of every zone, so one sighting was being announced across most of the town.
+USER_REPORTS = []
 
 
 # ---------------------------------------------------------------- fetch / cache
@@ -344,7 +343,10 @@ if str(prev_year) in years:
             add_event(c["lat"], c["lng"], "animal-crash", f"Corridor {c['id']}, {c['crashes']} crashes in {prev_year}",
                       c["crashes"], c["risk"], f"{prev_year}-{c['id']}")
 for r in USER_REPORTS:
-    add_event(r["lat"], r["lng"], r["species"], r["road"], 1, "Monitored", r["id"])
+    # The spoken alert covers a 2-mile radius, far wider than one sighting can vouch for, so
+    # driver reports stay species-neutral there ("Wildlife crossing ahead"). The map pin still
+    # names the animal from the reports list above.
+    add_event(r["lat"], r["lng"], "wildlife", r["road"], 1, "Monitored", r["id"])
 feed = {
     "updatedAt": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     "expiresAt": (datetime.date.today() + datetime.timedelta(days=120)).isoformat() + "T00:00:00Z",
