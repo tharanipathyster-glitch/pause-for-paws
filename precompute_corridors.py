@@ -98,8 +98,12 @@ def load_year(year):
         try:
             rows = fetch_year(year)
             print(f"{year}: fetched {len(rows)} rows from Iowa DOT")
-            write_cache(year, rows)
-            return rows, "live"
+            if rows:
+                write_cache(year, rows)
+                return rows, "live"
+            # An empty answer is not a failed request, but it must not wipe a year we already hold
+            # (Iowa DOT's 2026-10-01 publish dropped every 2026 crash from the service).
+            print(f"{year}: Iowa DOT returned nothing; keeping the cached copy")
         except Exception as exc:  # network down, service changed, etc.
             print(f"{year}: live fetch failed ({exc}); using cache")
     rows = read_cache(year)
