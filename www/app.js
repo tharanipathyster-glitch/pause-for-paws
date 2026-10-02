@@ -768,16 +768,30 @@ fetch("iowa-zips.json")
    the next reinstall. Try the live site first so the app picks up new Iowa
    data without a reinstall; fall back to the bundled copy when offline or
    unreachable. The website itself just fetches its own same-origin copy. */
+
+/* The live file is only used if it has corridors for its default year and is not a step back
+   from the copy shipped in the app (on 2026-10-01 Iowa DOT dropped the whole current year, and
+   the site served last year only until the next deploy). */
+function corridorDataUsable(data, bundled) {
+  const current = data && data.years && data.years[data.defaultYear];
+  if (!current || !Array.isArray(current.corridors) || !current.corridors.length) return false;
+  if (!current.desMoines || !Array.isArray(current.desMoines.corridors)) return false;
+  return data.defaultYear >= bundled.defaultYear;
+}
+
 async function fetchCorridorData() {
-  if (isNativeApp) {
-    try {
-      const response = await fetch("https://pauseforpawsusa.org/corridors.json", { cache: "no-store", signal: AbortSignal.timeout(5000) });
-      if (response.ok) return response.json();
-    } catch (error) { /* offline or unreachable; fall back to the bundled copy below */ }
-  }
   const response = await fetch("corridors.json");
   if (!response.ok) throw new Error("corridors.json not found");
-  return response.json();
+  const bundled = await response.json();
+  if (!isNativeApp) return bundled;
+  try {
+    const live = await fetch("https://pauseforpawsusa.org/corridors.json", { cache: "no-store", signal: AbortSignal.timeout(5000) });
+    if (live.ok) {
+      const data = await live.json();
+      if (corridorDataUsable(data, bundled)) return data;
+    }
+  } catch (error) { /* offline, unreachable or not JSON; use the bundled copy */ }
+  return bundled;
 }
 
 fetchCorridorData()
