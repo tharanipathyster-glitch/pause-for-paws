@@ -22,3 +22,9 @@ google-maps-config.js
 _backup_*
 pause-for-paws-team-deck.pptx
 *.apk
+
+# Local clutter that is not part of the project
+__pycache__/
+android/demo.mp4
+android/emulator-check*.png
+android/.idea/appInsightsSettings.xml
