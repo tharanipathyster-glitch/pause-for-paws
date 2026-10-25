@@ -92,17 +92,30 @@ def read_cache(year):
     return rows
 
 
+def dedupe(rows):
+    """One row per case number: paging a non-unique sort key can return the same crash twice."""
+    seen, out = set(), []
+    for r in rows:
+        k = r.get("id")
+        if k:
+            if k in seen:
+                continue
+            seen.add(k)
+        out.append(r)
+    return out
+
+
 FETCH_TRIES = 3
 FETCH_WAIT = 20  # seconds between tries; the service sometimes answers with nothing for a while after a publish
 SHRINK_LIMIT = 0.98  # a fetch with fewer than this share of the cached rows is treated as a bad feed
 
 
 def load_year(year):
-    cached = read_cache(year)
+    cached = dedupe(read_cache(year))
     if not OFFLINE:
         for attempt in range(1, FETCH_TRIES + 1):
             try:
-                rows = fetch_year(year)
+                rows = dedupe(fetch_year(year))
                 print(f"{year}: fetched {len(rows)} rows from Iowa DOT (try {attempt} of {FETCH_TRIES})")
                 if rows and len(rows) >= len(cached) * SHRINK_LIMIT:
                     write_cache(year, rows)
