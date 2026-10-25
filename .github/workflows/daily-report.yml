@@ -1,0 +1,31 @@
+name: Daily WhatsApp report
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # 7:00 PM US Central while daylight time is on (6:00 PM after the clocks go back on 1 Nov; change to "0 1 * * *" then)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build and send the report
+        env:
+          WA_TOKEN: ${{ secrets.WA_TOKEN }}
+          WA_PHONE_NUMBER_ID: ${{ secrets.WA_PHONE_NUMBER_ID }}
+          WA_TO: ${{ secrets.WA_TO }}
+          WA_TEMPLATE: ${{ secrets.WA_TEMPLATE }}
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+          PLAY_BUCKET: ${{ secrets.PLAY_BUCKET }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          ASC_VENDOR: ${{ secrets.ASC_VENDOR }}
+        run: node scripts/daily-report.mjs
