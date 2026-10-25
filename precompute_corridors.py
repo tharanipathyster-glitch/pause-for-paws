@@ -269,6 +269,15 @@ WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 DSM = {"south": 41.15, "north": 42.10, "west": -94.55, "east": -92.90}
 
 
+# A box a little wider than Iowa. Crashes with no real location come through as (0, 0) or as a fixed placeholder point
+# just over the Nebraska border; they still count in the totals but must not form a corridor.
+IOWA_BOX = {"south": 40.30, "north": 43.60, "west": -96.75, "east": -90.00}
+
+
+def in_iowa(r):
+    return IOWA_BOX["south"] <= r["lat"] <= IOWA_BOX["north"] and IOWA_BOX["west"] <= r["lng"] <= IOWA_BOX["east"]
+
+
 def build_year(year, rows, source):
     months, dates, weekdays = collections.Counter(), collections.Counter(), collections.Counter()
     latest = None
@@ -287,14 +296,15 @@ def build_year(year, rows, source):
     weekday = [{"day": WEEKDAY_NAMES[i], "crashes": weekdays.get(i, 0)} for i in range(7)]
     top_dates = [{"date": d, "crashes": c} for d, c in dates.most_common(10)]
 
-    all_clusters = cluster(rows)
+    located = [r for r in rows if in_iowa(r)]
+    all_clusters = cluster(located)
     dsm_rows = [r for r in rows
                 if DSM["south"] <= r["lat"] <= DSM["north"] and DSM["west"] <= r["lng"] <= DSM["east"]]
     dsm_clusters = cluster(dsm_rows)
 
     sev_all = collections.Counter(x["sev"] for x in rows)
     partial = year == THIS_YEAR
-    print(f"{year}: {len(rows)} crashes, {len(all_clusters)} clusters, peak {max(monthly, key=lambda m: m['crashes'])}, "
+    print(f"{year}: {len(rows)} crashes ({len(rows) - len(located)} without an Iowa location), {len(all_clusters)} clusters, peak {max(monthly, key=lambda m: m['crashes'])}, "
           f"latest {latest}")
     return {
         "year": year,
@@ -302,6 +312,7 @@ def build_year(year, rows, source):
         "through": latest.isoformat() if latest else None,
         "source": source,
         "totalCrashes": len(rows),
+        "unlocatedCrashes": len(rows) - len(located),
         "injuryOrWorse": sum(1 for x in rows if is_injury(x["sev"])),
         "fatal": sum(1 for x in rows if "Fatal" in x["sev"]),
         "severityBreakdown": dict(sev_all),
