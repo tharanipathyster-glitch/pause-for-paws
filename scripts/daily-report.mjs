@@ -13,25 +13,25 @@ async function freshness() {
     const y = j.years[String(j.defaultYear)];
     const age = Math.floor((Date.now() - new Date(j.generated + "T12:00:00Z").getTime()) / 86400000);
     const stale = age > 18 ? " STALE" : "";
-    return `Data: refreshed ${j.generated}${stale}, ${y.totalCrashes.toLocaleString("en-US")} crashes through ${y.through}`;
+    return `refreshed ${j.generated}${stale}, ${y.totalCrashes.toLocaleString("en-US")} crashes through ${y.through}`;
   } catch (e) {
-    return "Data: could not read the live site (" + e.message + ")";
+    return "could not read the live site (" + e.message + ")";
   }
 }
 
 async function mapsLoads() {
-  if (!env.GCP_SERVICE_ACCOUNT_JSON) return "Maps: not set up yet";
-  return "Maps: not set up yet";   // to be filled in once the Google read-only service account exists
+  if (!env.GCP_SERVICE_ACCOUNT_JSON) return "not set up yet";
+  return "not set up yet";   // to be filled in once the Google read-only service account exists
 }
 
 async function iosInstalls() {
-  if (!env.ASC_KEY_ID || !env.ASC_ISSUER_ID || !env.ASC_PRIVATE_KEY || !env.ASC_VENDOR) return "iOS installs: not set up yet";
-  return "iOS installs: not set up yet";   // to be filled in with the App Store Connect sales report
+  if (!env.ASC_KEY_ID || !env.ASC_ISSUER_ID || !env.ASC_PRIVATE_KEY || !env.ASC_VENDOR) return "not set up yet";
+  return "not set up yet";   // to be filled in with the App Store Connect sales report
 }
 
 async function androidInstalls() {
-  if (!env.GCP_SERVICE_ACCOUNT_JSON || !env.PLAY_BUCKET) return "Android installs: not set up yet";
-  return "Android installs: not set up yet";   // to be filled in with the Play Console installs report
+  if (!env.GCP_SERVICE_ACCOUNT_JSON || !env.PLAY_BUCKET) return "not set up yet";
+  return "not set up yet";   // to be filled in with the Play Console installs report
 }
 
 function oneLine(s) {
@@ -51,7 +51,7 @@ async function send(parts) {
     type: "template",
     template: {
       name: env.WA_TEMPLATE || "daily_report",
-      language: { code: env.WA_LANG || "en_US" },
+      language: { code: env.WA_LANG || "en" },
       components: [{ type: "body", parameters: parts.map((t) => ({ type: "text", text: oneLine(t) })) }],
     },
   };
@@ -68,5 +68,5 @@ async function send(parts) {
 const lines = await Promise.all([freshness(), mapsLoads(), iosInstalls(), androidInstalls()]);
 const today = new Date().toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric" });
 console.log("Pause for Paws daily report, " + today);
-lines.forEach((l) => console.log(l));
+["Website data", "Google Maps", "iOS installs", "Android installs"].forEach((k, i) => console.log(k + ": " + lines[i]));
 await send([today, ...lines]);
