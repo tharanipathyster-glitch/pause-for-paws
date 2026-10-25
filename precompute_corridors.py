@@ -9,7 +9,7 @@ corridor clusters for each year.
     python precompute_corridors.py            # fetch live, fall back to cache
     python precompute_corridors.py --offline  # cache only, no network
 """
-import csv, json, math, sys, collections, datetime, calendar, urllib.parse, urllib.request
+import csv, json, math, sys, time, collections, datetime, calendar, urllib.parse, urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).parent
@@ -92,22 +92,35 @@ def read_cache(year):
     return rows
 
 
+FETCH_TRIES = 3
+FETCH_WAIT = 20  # seconds between tries; the service sometimes answers with nothing for a while after a publish
+SHRINK_LIMIT = 0.98  # a fetch with fewer than this share of the cached rows is treated as a bad feed
+
+
 def load_year(year):
+    cached = read_cache(year)
     if not OFFLINE:
-        try:
-            rows = fetch_year(year)
-            print(f"{year}: fetched {len(rows)} rows from Iowa DOT")
-            if rows:
-                write_cache(year, rows)
-                return rows, "live"
-            # An empty answer is not a failed request, but it must not wipe a year we already hold
-            # (Iowa DOT's 2026-10-01 publish dropped every 2026 crash from the service).
-            print(f"{year}: Iowa DOT returned nothing; keeping the cached copy")
-        except Exception as exc:  # network down, service changed, etc.
-            print(f"{year}: live fetch failed ({exc}); using cache")
-    rows = read_cache(year)
-    print(f"{year}: {len(rows)} rows from cache")
-    return rows, "cache"
+        for attempt in range(1, FETCH_TRIES + 1):
+            try:
+                rows = fetch_year(year)
+                print(f"{year}: fetched {len(rows)} rows from Iowa DOT (try {attempt} of {FETCH_TRIES})")
+                if rows and len(rows) >= len(cached) * SHRINK_LIMIT:
+                    write_cache(year, rows)
+                    return rows, "live"
+                if rows:
+                    # Fewer rows than we already hold: keep the bigger saved copy rather than shrink the site.
+                    print(f"{year}: WARNING fetched {len(rows)} rows but {len(cached)} are saved; keeping the saved copy")
+                    break
+                # An empty answer is not a failed request, but it must not wipe a year we already hold
+                # (Iowa DOT's 2026-10-01 publish dropped every 2026 crash from the service).
+                print(f"{year}: Iowa DOT returned nothing")
+            except Exception as exc:  # network down, service changed, etc.
+                print(f"{year}: live fetch failed ({exc})")
+            if attempt < FETCH_TRIES:
+                time.sleep(FETCH_WAIT)
+        print(f"{year}: WARNING using the saved copy")
+    print(f"{year}: {len(cached)} rows from cache")
+    return cached, "cache"
 
 
 # ---------------------------------------------------------------- clustering
