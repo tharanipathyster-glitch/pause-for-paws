@@ -36,13 +36,41 @@ jobs:
         # the cached data/crashes-*.csv in the repo if the service is unreachable.
         run: python precompute_corridors.py
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Fallback - bring this year's crashes in from ICAT
+        # Used when the Iowa DOT feed is empty or behind. The script checks everything (row count, repeated case numbers,
+        # dates, never fewer crashes than already saved) and only then replaces data/crashes-<year>.csv.
+        # This step can never stop the deploy: on any problem it keeps the saved data and the alarm step at the end reports it.
+        continue-on-error: true
+        run: |
+          set +e
+          node scripts/icat-fetch.mjs "$(date -u +%Y)"
+          code=$?
+          if [ "$code" -eq 0 ]; then
+            echo "ICAT data brought in; rebuilding corridors from the saved files"
+            python precompute_corridors.py --offline
+          elif [ "$code" -eq 10 ]; then
+            echo "Saved data already matches ICAT"
+          else
+            echo "::warning::ICAT fallback did not update the data (code $code); keeping the saved copy"
+          fi
+          exit 0
+
+      - name: Copy the website into www/ for the app builds
+        continue-on-error: true
+        run: node scripts/sync-web.js
+
       - name: Save the refreshed crash data back to the repository
         # Keeps the latest good rows in the repo so a later empty answer from Iowa DOT falls back to them,
         # not to an old copy. Commits made with GITHUB_TOKEN do not start another workflow run.
         run: |
           git config user.name "pause-for-paws-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add data/crashes-*.csv corridors.json data/corridors.json
+          git add data/crashes-*.csv corridors.json data/corridors.json www
           if git diff --cached --quiet; then
             echo "No change to the saved crash data"
           else
@@ -71,3 +99,7 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Alarm - fail the run if this year's crash data is stale
+        # Runs after the site has deployed, so a stale-data failure never blocks a release; it only makes GitHub email you.
+        run: node scripts/check-freshness.mjs
