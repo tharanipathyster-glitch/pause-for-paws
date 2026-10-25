@@ -42,11 +42,11 @@ jobs:
         run: |
           git config user.name "pause-for-paws-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add data/crashes-*.csv
+          git add data/crashes-*.csv corridors.json data/corridors.json
           if git diff --cached --quiet; then
             echo "No change to the saved crash data"
           else
-            git commit -m "Data refresh: save latest Iowa DOT crash rows [skip ci]"
+            git commit -m "Data refresh: save latest Iowa DOT crash rows and generated corridor files [skip ci]"
             git push
           fi
 
