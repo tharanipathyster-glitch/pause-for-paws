@@ -1,9 +1,15 @@
 name: Daily WhatsApp report
 
 on:
-  schedule:
-    - cron: "0 0 * * *"   # 7:00 PM US Central while daylight time is on (6:00 PM after the clocks go back on 1 Nov; change to "0 1 * * *" then)
+  # schedule is switched off until the daily_report template is approved by Meta:
+  # schedule:
+  #   - cron: "0 0 * * *"   # 7:00 PM US Central in daylight time (use "0 1 * * *" after 1 Nov)
   workflow_dispatch:
+    inputs:
+      hello:
+        description: "Send Meta hello_world instead of the report (connection test)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -28,4 +34,5 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
           ASC_VENDOR: ${{ secrets.ASC_VENDOR }}
+          WA_HELLO: ${{ inputs.hello && '1' || '0' }}
         run: node scripts/daily-report.mjs

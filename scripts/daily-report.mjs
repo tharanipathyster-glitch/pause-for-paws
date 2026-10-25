@@ -4,6 +4,7 @@
 // Each source returns one short line. A source that is not set up yet says so instead of failing the report.
 
 const DRY = process.argv.includes("--dry");
+const HELLO = process.argv.includes("--hello") || process.env.WA_HELLO === "1";   // connection test with Meta's built-in hello_world template
 const env = process.env;
 
 async function freshness() {
@@ -45,7 +46,12 @@ async function send(parts) {
     console.log("(not sent: " + (DRY ? "dry run" : "missing " + need.filter((k) => !env[k]).join(", ")) + ")");
     return;
   }
-  const body = {
+  const body = HELLO ? {
+    messaging_product: "whatsapp",
+    to: env.WA_TO.replace(/[^0-9]/g, ""),
+    type: "template",
+    template: { name: "hello_world", language: { code: "en_US" } },
+  } : {
     messaging_product: "whatsapp",
     to: env.WA_TO.replace(/[^0-9]/g, ""),
     type: "template",
