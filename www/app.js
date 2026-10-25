@@ -80,6 +80,23 @@ function renderTodayStamp() {
 }
 renderTodayStamp();
 
+/* ---------- stale data note (shows only while the newest crash is more than 14 days old) ---------- */
+
+function renderDataNotice() {
+  const el = $("#dataPause");
+  if (!el) return;
+  const last = DATA && DATA.partial && DATA.through ? new Date(DATA.through + "T12:00:00") : null;
+  const age = last ? Math.floor((Date.now() - last.getTime()) / 86400000) : 0;
+  if (age > 14) {
+    el.textContent = "Heads up: the " + year + " crash records on this page end on " +
+      last.toLocaleDateString("en-US", { month: "long", day: "numeric" }) +
+      ". Iowa DOT's crash data tool is having a problem with " + year + " records, so newer crashes are not included yet. We will update this site as soon as the data returns.";
+    el.hidden = false;
+  } else {
+    el.hidden = true;
+  }
+}
+
 /* ---------- year switch ---------- */
 
 function renderYearSwitch() {
@@ -99,6 +116,7 @@ function setYear(next) {
   DATA = ALL.years[year];
   if (selectedMonth > lastDataMonth()) selectedMonth = lastDataMonth();
   renderYearSwitch();
+  renderDataNotice();
   renderStats();
   renderMonthChart();
   renderMonthPicker();

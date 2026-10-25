@@ -157,6 +157,8 @@ a.primary-button { text-decoration: none; }
 
 /* year switch + partial-period states */
 .year-switch { display: flex; gap: 6px; margin: 22px 0 14px; }
+.data-pause { margin: 0 0 14px; padding: 12px 16px; border: 1px solid rgba(223,110,81,.45); background: rgba(243,240,232,.9); color: var(--ink); font-size: 13px; line-height: 1.5; }
+.data-pause[hidden] { display: none; }
 .year-pill { background: var(--panel); color: var(--green); border: 1px solid var(--line); padding: 9px 16px; font: 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; cursor: pointer; }
 .year-pill:hover { border-color: var(--green); }
 .year-pill.active { background: var(--green); border-color: var(--green); color: white; }
