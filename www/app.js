@@ -71,14 +71,14 @@ function lastDataMonth() {
 
 /* ---------- header date (today, refreshed at midnight) ---------- */
 
-function renderTodayStamp() {
-  const now = new Date();
-  $("#updatedStamp").textContent = now.toLocaleDateString("en-US",
-    { weekday: "short", day: "numeric", month: "short", year: "numeric" });
-  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  window.setTimeout(renderTodayStamp, midnight - now + 1000);
+/* The header shows how current the crash data is (its newest crash date), not today's date. */
+function renderDataStamp() {
+  const el = $("#updatedStamp");
+  if (!el || !DATA) return;
+  el.textContent = DATA.partial
+    ? (DATA.through ? `Data through ${formatIsoDate(DATA.through)}` : `${DATA.year} so far`)
+    : `Full year ${DATA.year}`;
 }
-renderTodayStamp();
 
 /* ---------- stale data note (shows only while the newest crash is more than 14 days old) ---------- */
 
@@ -132,6 +132,7 @@ function setYear(next) {
 
 function renderStats() {
   $("#dataStamp").textContent = `Iowa DOT crash records, ${periodLabel()}`;
+  renderDataStamp();
   $("#mapKicker").textContent = `Iowa DOT crash records / ${periodLabel()}`;
   $("#statCrashesLabel").textContent = `Crashes in ${periodLabel()}`;
   $("#statCrashes").textContent = DATA.totalCrashes.toLocaleString();
