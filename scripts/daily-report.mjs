@@ -397,7 +397,8 @@ async function buildReport(subject, rows) {
     '<table width="100%" style="border-collapse:collapse"><tr><td bgcolor="#17382b" style="background:#17382b;border-radius:12px;padding:14px 18px">' +
     '<table style="border-collapse:collapse"><tr>' + (existsSync(LOGO_PATH) ? '<td style="padding:0 14px 0 0;vertical-align:middle"><img src="cid:applogo" width="52" height="52" alt="Pause for Paws" style="display:block;border-radius:12px;border:0"></td>' : "") +
     '<td style="vertical-align:middle"><div style="font-size:21px;font-weight:bold;color:#ffffff">Pause for Paws</div>' +
-    '<div style="font-size:12.5px;color:#bfd8cb;margin-top:2px">' + escapeHtml(subject.replace(/^Pause for Paws /, "")) + "</div></td></tr></table></td></tr></table>" +
+    '<div style="font-size:12.5px;color:#bfd8cb;margin-top:2px">' + escapeHtml(subject.replace(/^Pause for Paws /, "")) + "</div>" +
+    '<div style="font-size:11.5px;color:#8fb8a3;margin-top:2px">Built by The Blizzards, a Waukee middle school STEM team</div></td></tr></table></td></tr></table>' +
     (headline ? '<div style="font-size:15.5px;font-weight:bold;line-height:1.4;margin:14px 0 0">' + escapeHtml(headline) + "</div>" : "") +
     tilesHtml + iosCharts + mapsCharts + quarter +
     '<div style="margin:14px 0 6px;font-weight:bold;font-size:14.5px">Details</div><table style="border-collapse:collapse;font-size:13px">' +
