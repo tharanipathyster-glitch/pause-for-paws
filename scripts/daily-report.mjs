@@ -100,6 +100,24 @@ async function monitoringDaily(token, project, filter, days) {
   return out;
 }
 
+// Dry-run diagnostic: which Maps methods and response codes make up the request count (counts only, nothing private).
+async function mapsBreakdown() {
+  const sa = JSON.parse(env.GCP_SERVICE_ACCOUNT_JSON);
+  const token = await googleToken(sa);
+  const end = new Date(), start = new Date(end.getTime() - 30 * 86400e3);
+  const q = new URLSearchParams({
+    filter: 'metric.type="serviceruntime.googleapis.com/api/request_count" AND resource.labels.service="maps-backend.googleapis.com"',
+    "interval.startTime": start.toISOString(), "interval.endTime": end.toISOString(),
+    "aggregation.alignmentPeriod": 30 * 86400 + "s", "aggregation.perSeriesAligner": "ALIGN_SUM", "aggregation.crossSeriesReducer": "REDUCE_SUM", view: "FULL",
+  });
+  for (const g of ["resource.labels.method", "metric.labels.response_code_class"]) q.append("aggregation.groupByFields", g);
+  const r = await fetch("https://monitoring.googleapis.com/v3/projects/" + sa.project_id + "/timeSeries?" + q, { headers: { Authorization: "Bearer " + token } });
+  const j = await r.json();
+  if (j.error) return j.error.message;
+  return (j.timeSeries || []).map((ts) => (ts.resource.labels.method || "?") + " | " + (ts.metric.labels.response_code_class || "?") + " = " +
+    (ts.points || []).reduce((a, x) => a + Number(x.value.int64Value ?? x.value.doubleValue ?? 0), 0)).join(" ;; ");
+}
+
 let mapsPromise;
 function mapsData() {
   return (mapsPromise ??= (async () => {
@@ -411,7 +429,7 @@ async function buildReport(subject, rows) {
     '<table style="border-collapse:collapse"><tr>' + (existsSync(LOGO_PATH) ? '<td style="padding:0 14px 0 0;vertical-align:middle"><img src="cid:applogo" width="52" height="52" alt="Pause for Paws" style="display:block;border-radius:12px;border:0"></td>' : "") +
     '<td style="vertical-align:middle"><div style="font-size:21px;font-weight:bold;color:#ffffff">Pause for Paws</div>' +
     '<div style="font-size:12.5px;color:#bfd8cb;margin-top:2px">' + escapeHtml(subject.replace(/^Pause for Paws /, "")) + "</div>" +
-    '<div style="font-size:11.5px;color:#8fb8a3;margin-top:2px">Built by The Blizzards, a Waukee middle school STEM team</div></td></tr></table></td></tr></table>' +
+    '<div style="font-size:11.5px;color:#8fb8a3;margin-top:2px">Built by The Blizzards, a Waukee middle school student team</div></td></tr></table></td></tr></table>' +
     (headline ? '<div style="font-size:15.5px;font-weight:bold;line-height:1.4;margin:14px 0 0">' + escapeHtml(headline) + "</div>" : "") +
     tilesHtml + iosCharts + mapsCharts + quarter +
     '<div style="margin:14px 0 6px;font-weight:bold;font-size:14.5px">Details</div><table style="border-collapse:collapse;font-size:13px">' +
@@ -450,6 +468,7 @@ try { report = await buildReport(subject, labels.map((k, i) => [k, lines[i]])); 
 
 if (DRY) {
   // Dry runs also print the finished report page (counts only) so a one-page PDF can be made from it without sending an email.
+  try { console.log("MAPS_BREAKDOWN " + await mapsBreakdown()); } catch (e) { console.log("breakdown failed " + e.message); }
   console.log("REPORT_HTML " + Buffer.from(report.html).toString("base64"));
 }
 
