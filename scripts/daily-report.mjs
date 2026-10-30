@@ -3,6 +3,7 @@
 //      node scripts/daily-report.mjs --dry    (never sends; the workflow's dry_run input does the same)
 // Each source returns one short line. A source that is not set up yet says so instead of failing the report.
 import { createSign } from "node:crypto";
+import { gunzipSync } from "node:zlib";
 
 const DRY = process.argv.includes("--dry") || process.env.WA_DRY === "1";
 const HELLO = process.argv.includes("--hello") || process.env.WA_HELLO === "1";   // connection test with Meta's built-in hello_world template
@@ -80,15 +81,65 @@ async function mapsLoads() {
       kind = "requests";
     }
     return day.toLocaleString("en-US") + " " + kind + " in the last 24 hours, " + week.toLocaleString("en-US") +
-      " in 7 days (free allowance about 10,000 a month)";
+      " in 7 days (Google gives about 10,000 free map loads a month)";
   } catch (e) {
     return "could not read Google usage (" + String(e.message).slice(0, 80) + ")";
   }
 }
 
+// ---- iOS downloads, from App Store Connect's daily sales reports (read-only "Sales and Reports" key) ----
+
+const APPLE_APP_ID = env.APPLE_APP_ID || "6816612414";                 // Pause for Paws
+const FIRST_DOWNLOAD_TYPES = new Set(["1", "1F", "1T"]);               // first-time downloads (iPhone, universal, iPad)
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function ascToken() {
+  const now = Math.floor(Date.now() / 1000);
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const unsigned = b64({ alg: "ES256", kid: env.ASC_KEY_ID, typ: "JWT" }) + "." +
+    b64({ iss: env.ASC_ISSUER_ID, iat: now, exp: now + 900, aud: "appstoreconnect-v1" });
+  const key = env.ASC_PRIVATE_KEY.replace(/\\n/g, "\n");
+  const signature = createSign("SHA256").update(unsigned).sign({ key, dsaEncoding: "ieee-p1363" }, "base64url");
+  return unsigned + "." + signature;
+}
+
+// First-time downloads of the app on one day, or null when Apple has no report for that day (no sales, or not published yet).
+async function firstDownloadsOn(token, date) {
+  const q = new URLSearchParams({
+    "filter[frequency]": "DAILY", "filter[reportSubType]": "SUMMARY", "filter[reportType]": "SALES",
+    "filter[vendorNumber]": env.ASC_VENDOR, "filter[reportDate]": date,
+  });
+  const r = await fetch("https://api.appstoreconnect.apple.com/v1/salesReports?" + q, {
+    headers: { Authorization: "Bearer " + token, Accept: "application/a-gzip, application/json" },
+  });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error("Apple said HTTP " + r.status + " " + (await r.text()).slice(0, 120));
+  const text = gunzipSync(Buffer.from(await r.arrayBuffer())).toString("utf8");
+  const rows = text.split(/\r?\n/).filter(Boolean).map((l) => l.split("\t"));
+  const head = rows.shift() || [];
+  const iId = head.indexOf("Apple Identifier"), iUnits = head.indexOf("Units"), iType = head.indexOf("Product Type Identifier");
+  if (iId < 0 || iUnits < 0 || iType < 0) throw new Error("unexpected report columns");
+  return rows.filter((c) => c[iId] === APPLE_APP_ID && FIRST_DOWNLOAD_TYPES.has(c[iType])).reduce((a, c) => a + Number(c[iUnits] || 0), 0);
+}
+
 async function iosInstalls() {
   if (!env.ASC_KEY_ID || !env.ASC_ISSUER_ID || !env.ASC_PRIVATE_KEY || !env.ASC_VENDOR) return "not set up yet";
-  return "not set up yet";   // to be filled in with the App Store Connect sales report
+  try {
+    const token = ascToken();
+    const days = [];
+    for (let i = 1; i <= 30; i++) {
+      const date = new Date(Date.now() - i * 86400e3).toISOString().slice(0, 10);
+      days.push({ date, n: await firstDownloadsOn(token, date) });
+      await sleep(150);
+    }
+    const have = days.filter((d) => d.n !== null);
+    if (!have.length) return "no download reports from Apple yet (they can lag a day or two)";
+    const sum = (list) => list.reduce((a, d) => a + (d.n || 0), 0);
+    const latest = have[0];
+    return latest.n + " new downloads on " + latest.date + " (last 7 days: " + sum(days.slice(0, 7)) + ", last 30 days: " + sum(days) + ")";
+  } catch (e) {
+    return "could not read App Store downloads (" + String(e.message).slice(0, 80) + ")";
+  }
 }
 
 async function androidInstalls() {
