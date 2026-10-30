@@ -4,6 +4,11 @@
 // Each source returns one short line. A source that is not set up yet says so instead of failing the report.
 import { createSign } from "node:crypto";
 import { gunzipSync } from "node:zlib";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+// The App Store icon already in the repo (the same artwork uploaded to App Store Connect); sent inline so it shows without loading remote images.
+const LOGO_PATH = fileURLToPath(new URL("../ios/App/App/Assets.xcassets/AppIcon.appiconset/IMG_1463.png", import.meta.url));
 
 const DRY = process.argv.includes("--dry") || process.env.WA_DRY === "1";
 const HELLO = process.argv.includes("--hello") || process.env.WA_HELLO === "1";   // connection test with Meta's built-in hello_world template
@@ -389,9 +394,10 @@ async function buildReport(subject, rows) {
   const headline = headBits.join(" ");
   const tilesHtml = tiles.length ? '<table width="100%" style="border-collapse:separate;border-spacing:8px 0;margin:14px -8px 0"><tr>' + tiles.join("") + "</tr></table>" : "";
   const html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#17221e;max-width:640px;background:#ffffff">' +
-    '<table width="100%" style="border-collapse:collapse"><tr><td bgcolor="#17382b" style="background:#17382b;border-radius:12px;padding:16px 18px">' +
-    '<div style="font-size:21px;font-weight:bold;color:#ffffff">Pause for Paws</div>' +
-    '<div style="font-size:12.5px;color:#bfd8cb;margin-top:2px">' + escapeHtml(subject.replace(/^Pause for Paws /, "")) + "</div></td></tr></table>" +
+    '<table width="100%" style="border-collapse:collapse"><tr><td bgcolor="#17382b" style="background:#17382b;border-radius:12px;padding:14px 18px">' +
+    '<table style="border-collapse:collapse"><tr>' + (existsSync(LOGO_PATH) ? '<td style="padding:0 14px 0 0;vertical-align:middle"><img src="cid:applogo" width="52" height="52" alt="Pause for Paws" style="display:block;border-radius:12px;border:0"></td>' : "") +
+    '<td style="vertical-align:middle"><div style="font-size:21px;font-weight:bold;color:#ffffff">Pause for Paws</div>' +
+    '<div style="font-size:12.5px;color:#bfd8cb;margin-top:2px">' + escapeHtml(subject.replace(/^Pause for Paws /, "")) + "</div></td></tr></table></td></tr></table>" +
     (headline ? '<div style="font-size:15.5px;font-weight:bold;line-height:1.4;margin:14px 0 0">' + escapeHtml(headline) + "</div>" : "") +
     tilesHtml + iosCharts + mapsCharts + quarter +
     '<div style="margin:14px 0 6px;font-weight:bold;font-size:14.5px">Details</div><table style="border-collapse:collapse;font-size:13px">' +
@@ -412,7 +418,8 @@ async function sendEmail(subject, rows, report) {
   if (DRY) { console.log("(email not sent: dry run; it would go to " + masked + ")"); return true; }
   const nodemailer = await loadNodemailer();
   const transport = nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user, pass } });
-  const info = await transport.sendMail({ from: '"Pause for Paws report" <' + user + ">", to, subject, text, html: report.html });
+  const info = await transport.sendMail({ from: '"Pause for Paws report" <' + user + ">", to, subject, text, html: report.html,
+    attachments: existsSync(LOGO_PATH) ? [{ filename: "pause-for-paws.png", path: LOGO_PATH, cid: "applogo" }] : [] });
   console.log("Email sent to " + masked + " (" + info.messageId + ")");
   return true;
 }
