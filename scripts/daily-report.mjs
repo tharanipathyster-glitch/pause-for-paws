@@ -110,7 +110,7 @@ function mapsData() {
       week = await monitoringSum(token, project, requests, 168);
       kind = "requests"; filter = requests;
     }
-    const all = await monitoringDaily(token, project, filter, 100);
+    const all = await monitoringDaily(token, project, filter, 190);
     const daily = all.slice(-30);
     const sumOf = (list) => list.reduce((a, d) => a + d.n, 0);
     // Calendar month to date and calendar quarter to date (UTC dates; Google resets free usage on the 1st).
@@ -124,8 +124,15 @@ function mapsData() {
       const key = y + "-" + pad(k);
       quarterMonths.push({ label: new Date(Date.UTC(y, k, 1)).toLocaleDateString("en-US", { timeZone: "UTC", month: "long" }), n: sumOf(all.filter((d) => d.date.startsWith(key))) });
     }
+    const monthDaily = all.filter((d) => d.date.startsWith(monthKey));
+    // Earlier calendar months, oldest first, starting at the first month that has any usage.
+    const byMonth = new Map();
+    for (const d of all) byMonth.set(d.date.slice(0, 7), (byMonth.get(d.date.slice(0, 7)) || 0) + d.n);
+    const pastMonths = [...byMonth].filter(([k]) => k < monthKey).map(([k, n]) => ({ date: k + "-01", n,
+      label: new Date(k + "-01T12:00:00Z").toLocaleDateString("en-US", { timeZone: "UTC", month: "short" }) }));
+    while (pastMonths.length && !pastMonths[0].n) pastMonths.shift();
     return {
-      kind, day, week, daily, month: sumOf(daily),
+      kind, day, week, daily, monthDaily, pastMonths, month: sumOf(daily),
       monthName: new Date(Date.UTC(y, mo, 1)).toLocaleDateString("en-US", { timeZone: "UTC", month: "long" }),
       mtd, projected: Math.round(mtd / dayOfMonth * daysInMonth), dayOfMonth, daysInMonth,
       quarterLabel: "Q" + (Math.floor(mo / 3) + 1) + " " + y, quarterMonths, quarterTotal: sumOf(quarterMonths),
@@ -280,21 +287,29 @@ function tile(label, value, note) {
     '<div style="font-size:11px;color:#5b6b64">' + escapeHtml(note) + "</div></td>";
 }
 
-function barChart(title, series, color, unit) {
+// Moments worth marking on the charts (shown as a flag under that day's bar).
+const EVENTS = [{ date: "2026-10-21", label: "WHO 13 featured the app" }];
+
+function barChart(title, series, color, unit, opts = {}) {
   const max = Math.max(1, ...series.map((d) => d.n));
   const total = series.reduce((a, d) => a + d.n, 0);
+  const labelOf = opts.label || ((d) => Number(d.date.slice(8)));
+  const marks = opts.events === false ? [] : EVENTS.filter((e) => series.some((d) => d.date === e.date));
   const cols = series.map((d) => {
     const h = d.n ? Math.max(3, Math.round((d.n / max) * 100)) : 1;
     return '<td valign="bottom" title="' + shortDate(d.date) + ": " + fmt(d.n) + '" style="padding:0 1px;height:126px;vertical-align:bottom">' +
       '<div style="text-align:center;font-size:9px;font-weight:bold;color:#17221e;height:13px;line-height:13px">' + (d.n || "") + "</div>" +
       '<div style="height:' + h + "px;background:" + (d.n ? color : "#d5ddd9") + ';border-radius:2px 2px 0 0;font-size:0;line-height:0">&nbsp;</div></td>';
   }).join("");
+  const flags = marks.length ? '<table width="100%" style="border-collapse:collapse;table-layout:fixed;font-size:9px;text-align:center;color:#b3261e;font-weight:bold"><tr>' +
+    series.map((d) => '<td style="padding:0">' + (marks.some((e) => e.date === d.date) ? "&#9650;" : "&nbsp;") + "</td>").join("") + "</tr></table>" : "";
   return '<div style="margin:22px 0 4px;font-weight:bold;font-size:15px">' + escapeHtml(title) + "</div>" +
-    '<div style="font-size:12px;color:#5b6b64;margin-bottom:6px">' + fmt(total) + " " + unit + " in 30 days. Tallest day: " + fmt(max) + ".</div>" +
+    '<div style="font-size:12px;color:#5b6b64;margin-bottom:6px">' + fmt(total) + " " + unit + " " + (opts.span || "in 30 days") + ". Tallest bar: " + fmt(max) + ".</div>" +
     '<table width="100%" style="border-collapse:collapse;table-layout:fixed;border-bottom:1px solid #9aa8a1"><tr>' + cols + "</tr></table>" +
     '<table width="100%" style="border-collapse:collapse;table-layout:fixed;font-size:8.5px;font-weight:bold;color:#2f3b35;text-align:center"><tr>' +
-    series.map((d) => '<td style="padding:2px 0">' + Number(d.date.slice(8)) + "</td>").join("") + "</tr></table>" +
-    '<div style="font-size:11px;color:#5b6b64">Day of month, ' + shortDate(series[0].date) + " to " + shortDate(series[series.length - 1].date) + "</div>";
+    series.map((d) => '<td style="padding:2px 0">' + labelOf(d) + "</td>").join("") + "</tr></table>" + flags +
+    (marks.length ? '<div style="font-size:11px;color:#b3261e">&#9650; ' + marks.map((e) => shortDate(e.date) + ": " + escapeHtml(e.label)).join("; ") + "</div>" : "") +
+    (opts.note ? '<div style="font-size:11px;color:#5b6b64">' + opts.note + "</div>" : "");
 }
 
 const WEEKLY = env.REPORT_MODE === "weekly";
@@ -316,7 +331,7 @@ async function executiveHtml() {
     } else {
       tiles.push(tile("Downloads, 7 days", fmt(sum(days.slice(0, 7))), "last 30 days: " + fmt(sum(days.slice(0, 30)))));
     }
-    iosChart = barChart("iOS downloads per day, last 30 days", days.slice(0, 30).reverse().map((d) => ({ date: d.date, n: d.n || 0 })), "#2e7d5b", "downloads");
+    iosChart = barChart("iOS downloads per day, last 30 days", days.slice(0, 30).reverse().map((d) => ({ date: d.date, n: d.n || 0 })), "#2e7d5b", "downloads", { note: "Day of month" });
   }
   let mapsChart = "";
   if (maps.status === "fulfilled" && maps.value) {
@@ -327,7 +342,8 @@ async function executiveHtml() {
     }
     tiles.push(tile("Google Maps, " + m.monthName + " so far", fmt(m.mtd), "of about 10,000 free a month; on pace for " + fmt(m.projected)));
     if (!WEEKLY) tiles.push(tile("Google Maps, 24 hours", fmt(m.day), m.kind + "; 7 days: " + fmt(m.week)));
-    mapsChart = barChart("Google Maps " + m.kind + " per day, last 30 days", m.daily, "#3b6fb6", m.kind);
+    mapsChart = barChart("Google Maps " + m.kind + " per day, " + m.monthName + " so far", m.monthDaily, "#3b6fb6", m.kind, { span: "so far this month", note: "Day of month" });
+    if (m.pastMonths.length) mapsChart += barChart("Google Maps " + m.kind + " by month, earlier months", m.pastMonths, "#7d93b8", m.kind, { label: (d) => d.label, span: "in earlier months", events: false });
   }
   if (tiles.length) html += '<table width="100%" style="border-collapse:separate;border-spacing:8px 0;margin:0 -8px"><tr>' + tiles.join("") + "</tr></table>";
   let quarter = "";
