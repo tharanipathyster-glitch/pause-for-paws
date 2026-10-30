@@ -10,6 +10,10 @@ on:
         description: "Send Meta hello_world instead of the report (connection test)"
         type: boolean
         default: false
+      dry_run:
+        description: "Build the report and print it, but do not send the WhatsApp message"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -35,4 +39,5 @@ jobs:
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
           ASC_VENDOR: ${{ secrets.ASC_VENDOR }}
           WA_HELLO: ${{ inputs.hello && '1' || '0' }}
+          WA_DRY: ${{ inputs.dry_run && '1' || '0' }}
         run: node scripts/daily-report.mjs
