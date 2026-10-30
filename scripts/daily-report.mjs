@@ -335,11 +335,10 @@ async function executiveHtml() {
     const monthName = nowD.toLocaleDateString("en-US", { timeZone: "UTC", month: "long" });
     const monthDays = days.filter((d) => d.date.startsWith(monthKey)).reverse().map((d) => ({ date: d.date, n: d.n || 0 }));
     const byMonth = new Map();
-    for (const d of days) if (d.date >= LAUNCH_DATE && d.date.slice(0, 7) < monthKey) byMonth.set(d.date.slice(0, 7), (byMonth.get(d.date.slice(0, 7)) || 0) + (d.n || 0));
-    const past = [...byMonth].reverse().map(([k, n]) => ({ date: k + "-01", n, label: new Date(k + "-01T12:00:00Z").toLocaleDateString("en-US", { timeZone: "UTC", month: "short" }) }));
+    for (const d of days) if (d.date >= LAUNCH_DATE) byMonth.set(d.date.slice(0, 7), (byMonth.get(d.date.slice(0, 7)) || 0) + (d.n || 0));
+    const past = [...byMonth].reverse().map(([k, n]) => ({ date: k + "-01", n, label: new Date(k + "-01T12:00:00Z").toLocaleDateString("en-US", { timeZone: "UTC", month: "short" }) + (k === monthKey ? " (so far)" : "") }));
     iosChart = monthDays.length ? barChart("iOS downloads per day, " + monthName + " so far", monthDays, "#2e7d5b", "downloads", { span: "so far this month", note: "Day of month. Apple reports lag about two days, so the last two bars may still rise." }) : "";
-    iosChart += past.length ? barChart("iOS downloads by month, earlier months", past, "#7fb59a", "downloads", { label: (d) => d.label, span: "in earlier months", events: false })
-      : '<div style="margin:18px 0 0;font-size:12px;color:#5b6b64">iOS downloads by month, earlier months: none yet (the app went live ' + shortDate(LAUNCH_DATE) + ").</div>";
+    iosChart += past.length ? barChart("iOS downloads by month, since launch", past, "#7fb59a", "downloads", { label: (d) => d.label, span: "since launch", events: false, note: "Earlier months will fill in here as each month ends; the app went live " + shortDate(LAUNCH_DATE) + "." }) : "";
   }
   let mapsChart = "";
   if (maps.status === "fulfilled" && maps.value) {
