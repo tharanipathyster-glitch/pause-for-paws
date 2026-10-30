@@ -185,8 +185,53 @@ async function send(parts) {
   console.log("WhatsApp send ok:", text);
 }
 
+// ---- Email through Gmail (an app password, not the account password) ----
+
+const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+async function loadNodemailer() {
+  try { return (await import("nodemailer")).default; }
+  catch {
+    // The workflow installs it into .mail-deps so the project's own dependencies stay untouched.
+    const { createRequire } = await import("node:module");
+    return createRequire(process.cwd() + "/")("./.mail-deps/node_modules/nodemailer");
+  }
+}
+
+async function sendEmail(subject, rows) {
+  const user = env.GMAIL_USER;
+  const pass = (env.GMAIL_APP_PASSWORD || "").replace(/\s+/g, "");
+  if (!user || !pass) return false;
+  const to = env.EMAIL_TO || user;
+  const masked = to.replace(/^(.{2}).*(@.*)$/, "$1***$2");
+  if (DRY) { console.log("(email not sent: dry run; it would go to " + masked + ")"); return true; }
+  const text = subject + "\n\n" + rows.map(([k, v]) => k + ": " + v).join("\n") + "\n";
+  const html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#17221e"><h2 style="margin:0 0 12px">' + escapeHtml(subject) + "</h2>" +
+    '<table style="border-collapse:collapse">' +
+    rows.map(([k, v]) => '<tr><td style="padding:6px 14px 6px 0;vertical-align:top;font-weight:bold;white-space:nowrap">' + escapeHtml(k) +
+      '</td><td style="padding:6px 0">' + escapeHtml(v) + "</td></tr>").join("") +
+    '</table><p style="color:#6b7280;font-size:12px;margin-top:16px">Automatic daily report for the Pause for Paws app owner.</p></div>';
+  const nodemailer = await loadNodemailer();
+  const transport = nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user, pass } });
+  const info = await transport.sendMail({ from: '"Pause for Paws report" <' + user + ">", to, subject, text, html });
+  console.log("Email sent to " + masked + " (" + info.messageId + ")");
+  return true;
+}
+
 const lines = await Promise.all([freshness(), mapsLoads(), iosInstalls(), androidInstalls()]);
 const today = new Date().toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric" });
-console.log("Pause for Paws daily report, " + today);
-["Website data", "Google Maps", "iOS installs", "Android installs"].forEach((k, i) => console.log(k + ": " + lines[i]));
-await send([today, ...lines]);
+const labels = ["Website data", "Google Maps", "iOS downloads", "Android installs"];
+const subject = "Pause for Paws daily report, " + today;
+console.log(subject);
+labels.forEach((k, i) => console.log(k + ": " + lines[i]));
+
+let delivered = false;
+try {
+  delivered = await sendEmail(subject, labels.map((k, i) => [k, lines[i]]));
+} catch (e) {
+  console.error("Email failed: " + String(e.message).slice(0, 200));
+  process.exit(1);   // fail the run so GitHub emails you about it
+}
+// WhatsApp stays switched off: Meta has locked the sending account until the business is verified.
+if (env.WA_ENABLED === "1") { await send([today, ...lines]); delivered = true; }
+if (!delivered) console.log("(nothing sent: no email settings found. Add GMAIL_USER and GMAIL_APP_PASSWORD as secrets.)");

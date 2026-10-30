@@ -28,3 +28,4 @@ __pycache__/
 android/demo.mp4
 android/emulator-check*.png
 android/.idea/appInsightsSettings.xml
+.mail-deps/
