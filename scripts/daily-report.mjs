@@ -305,7 +305,7 @@ function tile(label, value, note, accent, tr) {
 }
 
 // Moments worth marking on the charts (shown as a flag under that day's bar).
-const EVENTS = [{ date: "2026-10-21", label: "WHO 13 News (WHO-DT, NBC, Des Moines) featured the app", url: "https://who13.com/news/metro-news/waukee-middle-school-students-develop-app-to-warn-drivers-of-animal-crash-hotspots/" }];
+const EVENTS = [{ date: "2026-10-21", label: "WHO 13 News (Des Moines) featured the app", url: "https://who13.com/news/metro-news/waukee-middle-school-students-develop-app-to-warn-drivers-of-animal-crash-hotspots/" }];
 
 function barChart(title, series, color, unit, opts = {}) {
   const max = Math.max(1, ...series.map((d) => d.n));
