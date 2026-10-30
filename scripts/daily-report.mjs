@@ -100,22 +100,32 @@ async function monitoringDaily(token, project, filter, days) {
   return out;
 }
 
-// Dry-run diagnostic: which Maps methods and response codes make up the request count (counts only, nothing private).
+// Dry-run diagnostic: does the same Maps usage question get the same answer from different queries? (counts only)
 async function mapsBreakdown() {
   const sa = JSON.parse(env.GCP_SERVICE_ACCOUNT_JSON);
   const token = await googleToken(sa);
-  const end = new Date(), start = new Date(end.getTime() - 30 * 86400e3);
-  const q = new URLSearchParams({
-    filter: 'metric.type="serviceruntime.googleapis.com/api/request_count" AND resource.labels.service="maps-backend.googleapis.com"',
-    "interval.startTime": start.toISOString(), "interval.endTime": end.toISOString(),
-    "aggregation.alignmentPeriod": 30 * 86400 + "s", "aggregation.perSeriesAligner": "ALIGN_SUM", "aggregation.crossSeriesReducer": "REDUCE_SUM", view: "FULL",
-  });
-  for (const g of ["resource.labels.method", "metric.labels.response_code_class"]) q.append("aggregation.groupByFields", g);
-  const r = await fetch("https://monitoring.googleapis.com/v3/projects/" + sa.project_id + "/timeSeries?" + q, { headers: { Authorization: "Bearer " + token } });
-  const j = await r.json();
-  if (j.error) return j.error.message;
-  return (j.timeSeries || []).map((ts) => (ts.resource.labels.method || "?") + " | " + (ts.metric.labels.response_code_class || "?") + " = " +
-    (ts.points || []).reduce((a, x) => a + Number(x.value.int64Value ?? x.value.doubleValue ?? 0), 0)).join(" ;; ");
+  const filter = 'metric.type="serviceruntime.googleapis.com/api/request_count" AND resource.labels.service="maps-backend.googleapis.com"';
+  const total = async (days, period, reducer) => {
+    const end = new Date(), start = new Date(end.getTime() - days * 86400e3);
+    const q = new URLSearchParams({ filter, "interval.startTime": start.toISOString(), "interval.endTime": end.toISOString(),
+      "aggregation.alignmentPeriod": period + "s", "aggregation.perSeriesAligner": "ALIGN_SUM", view: "FULL" });
+    if (reducer) q.set("aggregation.crossSeriesReducer", "REDUCE_SUM");
+    let sum = 0, series = 0, points = 0, tok = "";
+    do {
+      if (tok) q.set("pageToken", tok);
+      const j = await (await fetch("https://monitoring.googleapis.com/v3/projects/" + sa.project_id + "/timeSeries?" + q, { headers: { Authorization: "Bearer " + token } })).json();
+      if (j.error) return "error " + j.error.message;
+      for (const ts of j.timeSeries || []) { series++; for (const x of ts.points || []) { points++; sum += Number(x.value.int64Value ?? x.value.doubleValue ?? 0); } }
+      tok = j.nextPageToken || "";
+    } while (tok);
+    return sum + " (" + series + " series, " + points + " points)";
+  };
+  const out = [];
+  for (const [label, days, period, reducer] of [["7d one bucket reduced", 7, 7 * 86400, true], ["7d daily reduced", 7, 86400, true], ["7d daily per series", 7, 86400, false],
+    ["30d daily reduced", 30, 86400, true], ["30d daily per series", 30, 86400, false], ["30d hourly per series", 30, 3600, false], ["30d one bucket reduced", 30, 30 * 86400, true]]) {
+    out.push(label + " = " + await total(days, period, reducer));
+  }
+  return out.join(" ;; ");
 }
 
 let mapsPromise;
