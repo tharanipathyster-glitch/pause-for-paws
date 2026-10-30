@@ -1,6 +1,6 @@
 {
-  "updatedAt": "2026-10-29T13:02:34Z",
-  "expiresAt": "2027-02-26T00:00:00Z",
+  "updatedAt": "2026-10-30T01:31:44Z",
+  "expiresAt": "2027-02-27T00:00:00Z",
   "source": "Iowa DOT Crash Data feature service (Traffic_Safety/Crash_Data), crashes whose major cause is Animal",
   "dataType": "historical",
   "totalCount": 5183,
