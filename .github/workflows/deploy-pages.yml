@@ -75,7 +75,13 @@ jobs:
             echo "No change to the saved crash data"
           else
             git commit -m "Data refresh: save latest Iowa DOT crash rows and generated corridor files [skip ci]"
-            git push
+            # GitHub occasionally answers a push with a passing server error; try a few times before giving up.
+            for try in 1 2 3 4; do
+              git push && break
+              [ "$try" -eq 4 ] && exit 1
+              sleep $((try * 10))
+              git pull --rebase -q || true
+            done
           fi
 
       - name: Assemble static site
