@@ -79,14 +79,19 @@ async function monitoringDaily(token, project, filter, days) {
     "aggregation.crossSeriesReducer": "REDUCE_SUM",
     view: "FULL",
   });
-  const r = await fetch("https://monitoring.googleapis.com/v3/projects/" + project + "/timeSeries?" + q, { headers: { Authorization: "Bearer " + token } });
-  const j = await r.json();
-  if (j.error) throw new Error(j.error.message);
   const byDay = new Map();
-  for (const ts of j.timeSeries || []) for (const p of ts.points || []) {
-    const d = new Date(new Date(p.interval.endTime).getTime() - 43200e3).toISOString().slice(0, 10);
-    byDay.set(d, (byDay.get(d) || 0) + Number(p.value.int64Value ?? p.value.doubleValue ?? 0));
-  }
+  let pageToken = "";
+  do {   // follow every page, or part of the history silently goes missing
+    if (pageToken) q.set("pageToken", pageToken);
+    const r = await fetch("https://monitoring.googleapis.com/v3/projects/" + project + "/timeSeries?" + q, { headers: { Authorization: "Bearer " + token } });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error.message);
+    for (const ts of j.timeSeries || []) for (const p of ts.points || []) {
+      const d = new Date(new Date(p.interval.endTime).getTime() - 43200e3).toISOString().slice(0, 10);
+      byDay.set(d, (byDay.get(d) || 0) + Number(p.value.int64Value ?? p.value.doubleValue ?? 0));
+    }
+    pageToken = j.nextPageToken || "";
+  } while (pageToken);
   const out = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(end.getTime() - i * 86400e3 - 43200e3).toISOString().slice(0, 10);
@@ -115,7 +120,15 @@ function mapsData() {
       week = await monitoringSum(token, project, requests, 168);
       kind = "requests"; filter = requests;
     }
-    const all = await monitoringDaily(token, project, filter, 190);
+    // Google's daily series has come back incomplete now and then. The last 7 days must match the separate 7-day total; otherwise ask again.
+    let all;
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      all = await monitoringDaily(token, project, filter, 190);
+      const last7 = all.slice(-7).reduce((a, d) => a + d.n, 0);
+      if (Math.abs(last7 - week) <= Math.max(10, week * 0.1)) break;
+      if (attempt === 4) throw new Error("Google daily usage did not match its 7-day total");
+      await sleep(3000);
+    }
     const daily = all.slice(-30);
     const sumOf = (list) => list.reduce((a, d) => a + d.n, 0);
     // Calendar month to date and calendar quarter to date (UTC dates; Google resets free usage on the 1st).
