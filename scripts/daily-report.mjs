@@ -330,6 +330,12 @@ const subject = "Pause for Paws daily report, " + today;
 console.log(subject);
 labels.forEach((k, i) => console.log(k + ": " + lines[i]));
 
+if (DRY) {
+  // Dry runs also print the daily numbers (counts only) so a one-page PDF can be built from them without sending an email.
+  const [i, m] = await Promise.allSettled([iosData(), mapsData()]);
+  console.log("REPORT_DATA " + JSON.stringify({ today, launch: LAUNCH_DATE, lines, ios: i.value || null, maps: m.value || null }));
+}
+
 let delivered = false;
 try {
   delivered = await sendEmail(subject, labels.map((k, i) => [k, lines[i]]));
