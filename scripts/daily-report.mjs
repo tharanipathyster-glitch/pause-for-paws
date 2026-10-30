@@ -305,7 +305,7 @@ function tile(label, value, note, accent, tr) {
 }
 
 // Moments worth marking on the charts (shown as a flag under that day's bar).
-const EVENTS = [{ date: "2026-10-21", label: "WHO 13 featured the app", url: "https://who13.com/news/metro-news/waukee-middle-school-students-develop-app-to-warn-drivers-of-animal-crash-hotspots/" }];
+const EVENTS = [{ date: "2026-10-21", label: "WHO 13 News (WHO-DT, NBC, Des Moines) featured the app", url: "https://who13.com/news/metro-news/waukee-middle-school-students-develop-app-to-warn-drivers-of-animal-crash-hotspots/" }];
 
 function barChart(title, series, color, unit, opts = {}) {
   const max = Math.max(1, ...series.map((d) => d.n));
@@ -403,7 +403,7 @@ async function buildReport(subject, rows) {
     '<div style="margin:14px 0 6px;font-weight:bold;font-size:14.5px">Details</div><table style="border-collapse:collapse;font-size:13px">' +
     rows.map(([k, v]) => '<tr><td style="padding:4px 14px 4px 0;vertical-align:top;font-weight:bold;white-space:nowrap">' + escapeHtml(k) + '</td><td style="padding:4px 0">' + escapeHtml(v) + "</td></tr>").join("") +
     '</table><p style="color:#6b7280;font-size:11px;margin-top:14px">Automatic report for the Pause for Paws app owner. Sources: App Store Connect sales reports (first-time downloads, about two days behind) and Google Cloud Monitoring request counts. Android will be added once the app has public installs.' +
-    EVENTS.map((e) => ' WHO 13 story: <a href="' + e.url + '" style="color:#6b7280">' + e.url + "</a>").join("") + "</p></div>";
+    EVENTS.map((e) => ' WHO 13 News story: <a href="' + e.url + '" style="color:#6b7280">' + e.url + "</a>").join("") + "</p></div>";
   return { html, headline };
 }
 
