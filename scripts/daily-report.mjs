@@ -275,16 +275,28 @@ async function loadNodemailer() {
   }
 }
 
-// ---- Executive summary for the email: headline numbers plus two 30-day bar charts (plain HTML, so every mail app shows them) ----
+// ---- Report design: header, one-line headline, tiles with trends, free-tier gauge, charts (plain HTML, so every mail app shows it) ----
 
 const fmt = (n) => Number(n).toLocaleString("en-US");
 const shortDate = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
+const GREEN = "#2e7d5b", BLUE = "#3b6fb6", AMBER = "#b26a00", RED = "#b3261e", MUTED = "#5b6b64";
+const FREE_LOADS = 10000;   // Google's monthly free map loads
 
-function tile(label, value, note) {
-  return '<td style="padding:12px 14px;background:#f1f6f3;border-radius:8px;vertical-align:top">' +
-    '<div style="font-size:11px;color:#5b6b64;text-transform:uppercase;letter-spacing:.04em">' + escapeHtml(label) + "</div>" +
-    '<div style="font-size:26px;font-weight:bold;color:#17221e;margin:4px 0 2px">' + escapeHtml(value) + "</div>" +
-    '<div style="font-size:11px;color:#5b6b64">' + escapeHtml(note) + "</div></td>";
+// Change against the previous period. upGood: a rise is good news (downloads); for Maps a rise is more usage, so it shows amber.
+function trend(cur, prev, upGood, what) {
+  if (!prev) return { arrow: "&#9679;", text: cur ? "new activity" : "no change", color: MUTED };
+  const pct = Math.round(((cur - prev) / prev) * 100);
+  if (pct === 0) return { arrow: "&#9679;", text: "no change " + what, color: MUTED };
+  const up = pct > 0;
+  return { arrow: up ? "&#9650;" : "&#9660;", text: Math.abs(pct) + "% " + what, color: up === upGood ? GREEN : AMBER };
+}
+
+function tile(label, value, note, accent, tr) {
+  return '<td style="padding:12px 14px;background:#f4f8f6;border:1px solid #e3e9e6;border-left:4px solid ' + accent + ';border-radius:10px;vertical-align:top">' +
+    '<div style="font-size:10.5px;color:' + MUTED + ';text-transform:uppercase;letter-spacing:.05em">' + escapeHtml(label) + "</div>" +
+    '<div style="font-size:27px;font-weight:bold;color:#17221e;margin:4px 0 2px">' + escapeHtml(value) + "</div>" +
+    (tr ? '<div style="font-size:11.5px;font-weight:bold;color:' + tr.color + '">' + tr.arrow + " " + escapeHtml(tr.text) + "</div>" : "") +
+    '<div style="font-size:10.5px;color:' + MUTED + ';margin-top:2px">' + escapeHtml(note) + "</div></td>";
 }
 
 // Moments worth marking on the charts (shown as a flag under that day's bar).
@@ -295,100 +307,112 @@ function barChart(title, series, color, unit, opts = {}) {
   const total = series.reduce((a, d) => a + d.n, 0);
   const labelOf = opts.label || ((d) => Number(d.date.slice(8)));
   const marks = opts.events === false ? [] : EVENTS.filter((e) => series.some((d) => d.date === e.date));
+  const peak = opts.peak || color;
   const cols = series.map((d) => {
     const h = d.n ? Math.max(3, Math.round((d.n / max) * 100)) : 1;
     return '<td valign="bottom" title="' + shortDate(d.date) + ": " + fmt(d.n) + '" style="padding:0 1px;height:126px;vertical-align:bottom">' +
       '<div style="text-align:center;font-size:9px;font-weight:bold;color:#17221e;height:13px;line-height:13px">' + (d.n || opts.showZero ? d.n : "") + "</div>" +
-      '<div style="height:' + h + "px;background:" + (d.n ? color : "#d5ddd9") + ';border-radius:2px 2px 0 0;font-size:0;line-height:0">&nbsp;</div></td>';
+      '<div style="height:' + h + "px;background:" + (!d.n ? "#d5ddd9" : d.n === max ? peak : color) + ';border-radius:3px 3px 0 0;font-size:0;line-height:0">&nbsp;</div></td>';
   }).join("");
-  const flags = marks.length ? '<table width="100%" style="border-collapse:collapse;table-layout:fixed;font-size:9px;text-align:center;color:#b3261e;font-weight:bold"><tr>' +
+  const flags = marks.length ? '<table width="100%" style="border-collapse:collapse;table-layout:fixed;font-size:9px;text-align:center;color:' + RED + ';font-weight:bold"><tr>' +
     series.map((d) => '<td style="padding:0">' + (marks.some((e) => e.date === d.date) ? "&#9650;" : "&nbsp;") + "</td>").join("") + "</tr></table>" : "";
-  return '<div style="margin:22px 0 4px;font-weight:bold;font-size:15px">' + escapeHtml(title) + "</div>" +
-    '<div style="font-size:12px;color:#5b6b64;margin-bottom:6px">' + fmt(total) + " " + unit + " " + (opts.span || "in 30 days") + ". Tallest bar: " + fmt(max) + ".</div>" +
+  return '<div style="margin:14px 0 0;padding:12px 14px;border:1px solid #e3e9e6;border-radius:12px;background:#ffffff">' +
+    '<div style="font-weight:bold;font-size:14.5px"><span style="display:inline-block;width:9px;height:9px;border-radius:5px;background:' + color + ';margin-right:7px"></span>' + escapeHtml(title) + "</div>" +
+    '<div style="font-size:12px;color:' + MUTED + ';margin:2px 0 6px">' + fmt(total) + " " + unit + " " + (opts.span || "in 30 days") + ". Tallest bar: " + fmt(max) + ".</div>" +
     '<table width="100%" style="border-collapse:collapse;table-layout:fixed;border-bottom:1px solid #9aa8a1"><tr>' + cols + "</tr></table>" +
     '<table width="100%" style="border-collapse:collapse;table-layout:fixed;font-size:8.5px;font-weight:bold;color:#2f3b35;text-align:center"><tr>' +
     series.map((d) => '<td style="padding:2px 0">' + labelOf(d) + "</td>").join("") + "</tr></table>" + flags +
-    (marks.length ? '<div style="font-size:11px;color:#b3261e">&#9650; ' + marks.map((e) => shortDate(e.date) + ": " + (e.url ? '<a href="' + e.url + '" style="color:#b3261e">' + escapeHtml(e.label) + "</a>" : escapeHtml(e.label))).join("; ") + "</div>" : "") +
-    (opts.note ? '<div style="font-size:11px;color:#5b6b64">' + opts.note + "</div>" : "");
+    (marks.length ? '<div style="font-size:11px;color:' + RED + '">&#9650; ' + marks.map((e) => shortDate(e.date) + ": " + (e.url ? '<a href="' + e.url + '" style="color:' + RED + '">' + escapeHtml(e.label) + "</a>" : escapeHtml(e.label))).join("; ") + "</div>" : "") +
+    (opts.note ? '<div style="font-size:11px;color:' + MUTED + '">' + opts.note + "</div>" : "") + "</div>";
+}
+
+// Thin progress bar for the monthly free tier; colour follows where the month is heading, not where it is today.
+function gauge(m) {
+  const used = Math.min(100, Math.round((m.mtd / FREE_LOADS) * 100)), projPct = Math.round((m.projected / FREE_LOADS) * 100);
+  const color = projPct >= 90 ? RED : projPct >= 70 ? "#d98e04" : GREEN;
+  return '<div style="margin:14px 0 0;padding:12px 14px;border:1px solid #e3e9e6;border-radius:12px;background:#ffffff">' +
+    '<div style="font-weight:bold;font-size:14.5px">Google Maps free tier, ' + escapeHtml(m.monthName) + "</div>" +
+    '<div style="font-size:12px;color:' + MUTED + ';margin:2px 0 8px">' + fmt(m.mtd) + " of about " + fmt(FREE_LOADS) + " free a month (" + used + "% used). On pace to finish at " + fmt(m.projected) + " (" + projPct + "%).</div>" +
+    '<table width="100%" style="border-collapse:collapse"><tr><td width="' + Math.max(1, used) + '%" height="10" bgcolor="' + color + '" style="background:' + color + ';border-radius:5px;font-size:0;line-height:0">&nbsp;</td>' +
+    '<td height="10" bgcolor="#e3e9e6" style="background:#e3e9e6;border-radius:5px;font-size:0;line-height:0">&nbsp;</td></tr></table>' +
+    '<div style="font-size:10.5px;color:' + MUTED + ';margin-top:5px">Green under 70% of the free tier, amber 70-90%, red above 90%. These are request counts, so Billing is the source for the real bill.</div></div>';
 }
 
 const WEEKLY = env.REPORT_MODE === "weekly";
-const vs = (cur, prev) => prev ? (cur >= prev ? "up " : "down ") + Math.abs(Math.round((cur - prev) / prev * 100)) + "% from " + fmt(prev) + " the week before" : "week before: " + fmt(prev);
 
-async function executiveHtml() {
+async function buildReport(subject, rows) {
   const [ios, maps] = await Promise.allSettled([iosData(), mapsData()]);
-  let html = "";
-  const tiles = [];
-  let iosChart = "";
-  if (ios.status === "fulfilled" && ios.value) {
-    const days = ios.value, sum = (l) => l.reduce((a, d) => a + (d.n || 0), 0);
-    const since = days.filter((d) => d.date >= LAUNCH_DATE);
-    tiles.push(tile("Total users downloaded", fmt(sum(since)), "iOS, since launch (" + shortDate(LAUNCH_DATE) + ")"));
-    if (WEEKLY) {
-      const best = days.slice(0, 30).reduce((b, d) => ((d.n || 0) > (b.n || 0) ? d : b), days[0]);
-      tiles.push(tile("Downloads this week", fmt(sum(days.slice(0, 7))), vs(sum(days.slice(0, 7)), sum(days.slice(7, 14)))));
-      tiles.push(tile("Best day, last 30", fmt(best.n || 0), shortDate(best.date)));
-    } else {
-      tiles.push(tile("Downloads, 7 days", fmt(sum(days.slice(0, 7))), "last 30 days: " + fmt(sum(days.slice(0, 30)))));
+  const iosDays = ios.status === "fulfilled" ? ios.value : null, m = maps.status === "fulfilled" ? maps.value : null;
+  const sum = (l) => l.reduce((a, d) => a + (d.n || 0), 0);
+  const tiles = [], headBits = [];
+  let iosCharts = "", mapsCharts = "", quarter = "";
+
+  if (iosDays) {
+    const since = sum(iosDays.filter((d) => d.date >= LAUNCH_DATE)), wk = sum(iosDays.slice(0, 7)), prevWk = sum(iosDays.slice(7, 14));
+    const best = iosDays.filter((d) => d.date >= LAUNCH_DATE).reduce((b, d) => ((d.n || 0) > (b.n || 0) ? d : b), { n: 0, date: LAUNCH_DATE });
+    let line = fmt(since) + " iOS downloads since launch";
+    if (best.n) {
+      const ev = EVENTS.find((e) => { const gap = (Date.parse(best.date) - Date.parse(e.date)) / 86400e3; return gap >= 0 && gap <= 2; });
+      line += "; the best day was " + shortDate(best.date) + " with " + fmt(best.n) + (ev ? ", right after " + ev.label : "");
     }
+    headBits.push(line + ".");
+    tiles.push(tile("Total users downloaded", fmt(since), "iOS, since launch " + shortDate(LAUNCH_DATE), GREEN, { arrow: "&#9650;", text: fmt(wk) + " this week", color: wk ? GREEN : MUTED }));
+    tiles.push(tile(WEEKLY ? "Downloads, this week" : "Downloads, 7 days", fmt(wk), "last 30 days: " + fmt(sum(iosDays.slice(0, 30))), GREEN, trend(wk, prevWk, true, "vs the 7 days before")));
     const nowD = new Date(), monthKey = nowD.getUTCFullYear() + "-" + String(nowD.getUTCMonth() + 1).padStart(2, "0");
     const monthName = nowD.toLocaleDateString("en-US", { timeZone: "UTC", month: "long" });
-    const monthDays = days.filter((d) => d.date.startsWith(monthKey)).reverse().map((d) => ({ date: d.date, n: d.n || 0 }));
+    const monthDays = iosDays.filter((d) => d.date.startsWith(monthKey)).reverse().map((d) => ({ date: d.date, n: d.n || 0 }));
     const byMonth = new Map();
-    for (const d of days) if (d.date >= LAUNCH_DATE) byMonth.set(d.date.slice(0, 7), (byMonth.get(d.date.slice(0, 7)) || 0) + (d.n || 0));
+    for (const d of iosDays) if (d.date >= LAUNCH_DATE) byMonth.set(d.date.slice(0, 7), (byMonth.get(d.date.slice(0, 7)) || 0) + (d.n || 0));
     const past = [...byMonth].reverse().map(([k, n]) => ({ date: k + "-01", n, label: new Date(k + "-01T12:00:00Z").toLocaleDateString("en-US", { timeZone: "UTC", month: "short" }) + (k === monthKey ? " (so far)" : "") }));
     // Show the month before launch as 0 so the chart has an earlier month to compare with.
-    if (past.length && past[0].date.slice(0, 7) === LAUNCH_DATE.slice(0, 7)) {
-      const pm = new Date(Date.UTC(+LAUNCH_DATE.slice(0, 4), +LAUNCH_DATE.slice(5, 7) - 2, 1));
-      past.unshift({ date: pm.toISOString().slice(0, 10), n: 0, label: "Pre-launch" });
-    }
-    iosChart = monthDays.length ? barChart("iOS downloads per day, " + monthName + " so far", monthDays, "#2e7d5b", "downloads", { span: "so far this month", note: "Day of month. Apple reports lag about two days, so the last two bars may still rise." }) : "";
-    iosChart += past.length ? barChart("iOS downloads by month, since launch", past, "#7fb59a", "downloads", { label: (d) => d.label, span: "since launch", events: false, showZero: true, note: "Earlier months will fill in here as each month ends; the app went live " + shortDate(LAUNCH_DATE) + "." }) : "";
+    if (past.length && past[0].date.slice(0, 7) === LAUNCH_DATE.slice(0, 7)) past.unshift({ date: "pre", n: 0, label: "Pre-launch" });
+    if (monthDays.length) iosCharts += barChart("iOS downloads per day, " + monthName + " so far", monthDays, GREEN, "downloads", { peak: "#1b5e41", span: "so far this month", note: "Day of month. Apple reports lag about two days, so the last two bars may still rise." });
+    if (past.length) iosCharts += barChart("iOS downloads by month, since launch", past, "#7fb59a", "downloads", { peak: "#4f9a79", label: (d) => d.label, span: "since launch", events: false, showZero: true, note: "Earlier months fill in here as each month ends; the app went live " + shortDate(LAUNCH_DATE) + "." });
   }
-  let mapsChart = "";
-  if (maps.status === "fulfilled" && maps.value) {
-    const m = maps.value;
-    if (WEEKLY) {
-      const wk = m.daily.slice(-7).reduce((a, d) => a + d.n, 0), prev = m.daily.slice(-14, -7).reduce((a, d) => a + d.n, 0);
-      tiles.push(tile("Google Maps this week", fmt(wk), vs(wk, prev)));
-    }
-    tiles.push(tile("Google Maps, " + m.monthName + " so far", fmt(m.mtd), "of about 10,000 free a month; on pace for " + fmt(m.projected)));
-    if (!WEEKLY) tiles.push(tile("Google Maps, 24 hours", fmt(m.day), m.kind + "; 7 days: " + fmt(m.week)));
-    mapsChart = barChart("Google Maps " + m.kind + " per day, " + m.monthName + " so far", m.monthDaily, "#3b6fb6", m.kind, { span: "so far this month", note: "Day of month" });
-    if (m.pastMonths.length) mapsChart += barChart("Google Maps " + m.kind + " by month, earlier months", m.pastMonths, "#7d93b8", m.kind, { label: (d) => d.label, span: "in earlier months", events: false });
-  }
-  if (tiles.length) html += '<table width="100%" style="border-collapse:separate;border-spacing:8px 0;margin:0 -8px"><tr>' + tiles.join("") + "</tr></table>";
-  let quarter = "";
-  if (maps.status === "fulfilled" && maps.value) {
-    const m = maps.value;
-    quarter = '<div style="margin:22px 0 6px;font-weight:bold;font-size:15px">Google Maps usage, ' + escapeHtml(m.quarterLabel) + " (quarter to date)</div>" +
-      '<table style="border-collapse:collapse;font-size:14px">' +
+
+  if (m) {
+    const last7 = m.daily.slice(-7).reduce((a, d) => a + d.n, 0), prev7 = m.daily.slice(-14, -7).reduce((a, d) => a + d.n, 0);
+    headBits.push("Google Maps is at " + Math.round((m.mtd / FREE_LOADS) * 100) + "% of this month's free tier (on pace for " + Math.round((m.projected / FREE_LOADS) * 100) + "%).");
+    tiles.push(tile("Google Maps, " + m.monthName + " so far", fmt(m.mtd), "of about " + fmt(FREE_LOADS) + " free a month", BLUE, trend(last7, prev7, false, "last 7 days vs 7 before")));
+    tiles.push(WEEKLY
+      ? tile("Google Maps, this week", fmt(last7), m.kind + "; 30 days: " + fmt(m.month), BLUE, trend(last7, prev7, false, "vs the week before"))
+      : tile("Google Maps, 24 hours", fmt(m.day), m.kind + "; 7 days: " + fmt(m.week), BLUE, trend(m.day, m.daily[m.daily.length - 2] ? m.daily[m.daily.length - 2].n : 0, false, "vs the day before")));
+    mapsCharts += gauge(m);
+    mapsCharts += barChart("Google Maps " + m.kind + " per day, " + m.monthName + " so far", m.monthDaily, BLUE, m.kind, { peak: "#244e8a", span: "so far this month", note: "Day of month" });
+    if (m.pastMonths.length) mapsCharts += barChart("Google Maps " + m.kind + " by month, earlier months", m.pastMonths, "#7d93b8", m.kind, { peak: "#5877a6", label: (d) => d.label, span: "in earlier months", events: false });
+    quarter = '<div style="margin:14px 0 0;padding:12px 14px;border:1px solid #e3e9e6;border-radius:12px;background:#ffffff"><div style="font-weight:bold;font-size:14.5px;margin-bottom:6px">Google Maps usage, ' + escapeHtml(m.quarterLabel) + " (quarter to date)</div>" +
+      '<table style="border-collapse:collapse;font-size:13.5px">' +
       m.quarterMonths.map((q) => '<tr><td style="padding:3px 24px 3px 0">' + escapeHtml(q.label) + '</td><td align="right" style="padding:3px 0">' + fmt(q.n) + " " + m.kind + "</td></tr>").join("") +
-      '<tr><td style="padding:6px 24px 3px 0;border-top:1px solid #9aa8a1;font-weight:bold">Quarter total</td><td align="right" style="padding:6px 0 3px;border-top:1px solid #9aa8a1;font-weight:bold">' + fmt(m.quarterTotal) + " " + m.kind + "</td></tr></table>";
+      '<tr><td style="padding:6px 24px 3px 0;border-top:1px solid #9aa8a1;font-weight:bold">Quarter total</td><td align="right" style="padding:6px 0 3px;border-top:1px solid #9aa8a1;font-weight:bold">' + fmt(m.quarterTotal) + " " + m.kind + "</td></tr></table></div>";
   }
-  return html + iosChart + mapsChart + quarter;
+
+  const headline = headBits.join(" ");
+  const tilesHtml = tiles.length ? '<table width="100%" style="border-collapse:separate;border-spacing:8px 0;margin:14px -8px 0"><tr>' + tiles.join("") + "</tr></table>" : "";
+  const html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#17221e;max-width:640px;background:#ffffff">' +
+    '<table width="100%" style="border-collapse:collapse"><tr><td bgcolor="#17382b" style="background:#17382b;border-radius:12px;padding:16px 18px">' +
+    '<div style="font-size:21px;font-weight:bold;color:#ffffff">Pause for Paws</div>' +
+    '<div style="font-size:12.5px;color:#bfd8cb;margin-top:2px">' + escapeHtml(subject.replace(/^Pause for Paws /, "")) + "</div></td></tr></table>" +
+    (headline ? '<div style="font-size:15.5px;font-weight:bold;line-height:1.4;margin:14px 0 0">' + escapeHtml(headline) + "</div>" : "") +
+    tilesHtml + iosCharts + mapsCharts + quarter +
+    '<div style="margin:14px 0 6px;font-weight:bold;font-size:14.5px">Details</div><table style="border-collapse:collapse;font-size:13px">' +
+    rows.map(([k, v]) => '<tr><td style="padding:4px 14px 4px 0;vertical-align:top;font-weight:bold;white-space:nowrap">' + escapeHtml(k) + '</td><td style="padding:4px 0">' + escapeHtml(v) + "</td></tr>").join("") +
+    '</table><p style="color:#6b7280;font-size:11px;margin-top:14px">Automatic report for the Pause for Paws app owner. Sources: App Store Connect sales reports (first-time downloads, about two days behind) and Google Cloud Monitoring request counts. Android will be added once the app has public installs.' +
+    EVENTS.map((e) => ' WHO 13 story: <a href="' + e.url + '" style="color:#6b7280">' + e.url + "</a>").join("") + "</p></div>";
+  return { html, headline };
 }
 
-async function sendEmail(subject, rows) {
+async function sendEmail(subject, rows, report) {
   const user = env.GMAIL_USER;
   const pass = (env.GMAIL_APP_PASSWORD || "").replace(/\s+/g, "");
   if (!user || !pass) return false;
   const to = env.EMAIL_TO || user;
   const masked = to.replace(/^(.{2}).*(@.*)$/, "$1***$2");
-  const text = subject + "\n\n" + rows.map(([k, v]) => k + ": " + v).join("\n") + "\n";
-  let summary = "";
-  try { summary = await executiveHtml(); } catch (e) { console.error("Charts skipped: " + e.message); }
-  const html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#17221e;max-width:640px"><h2 style="margin:0 0 14px">' + escapeHtml(subject) + "</h2>" +
-    summary + '<div style="margin:24px 0 6px;font-weight:bold;font-size:15px">Details</div>' +
-    '<table style="border-collapse:collapse">' +
-    rows.map(([k, v]) => '<tr><td style="padding:6px 14px 6px 0;vertical-align:top;font-weight:bold;white-space:nowrap">' + escapeHtml(k) +
-      '</td><td style="padding:6px 0">' + escapeHtml(v) + "</td></tr>").join("") +
-    '</table><p style="color:#6b7280;font-size:12px;margin-top:16px">Automatic daily report for the Pause for Paws app owner.</p></div>';
-  if (env.PREVIEW_FILE) { (await import("node:fs")).writeFileSync(env.PREVIEW_FILE, html); console.log("Preview written to " + env.PREVIEW_FILE); }
+  const text = subject + "\n\n" + (report.headline ? report.headline + "\n\n" : "") + rows.map(([k, v]) => k + ": " + v).join("\n") + "\n";
+  if (env.PREVIEW_FILE) { (await import("node:fs")).writeFileSync(env.PREVIEW_FILE, report.html); console.log("Preview written to " + env.PREVIEW_FILE); }
   if (DRY) { console.log("(email not sent: dry run; it would go to " + masked + ")"); return true; }
   const nodemailer = await loadNodemailer();
   const transport = nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user, pass } });
-  const info = await transport.sendMail({ from: '"Pause for Paws report" <' + user + ">", to, subject, text, html });
+  const info = await transport.sendMail({ from: '"Pause for Paws report" <' + user + ">", to, subject, text, html: report.html });
   console.log("Email sent to " + masked + " (" + info.messageId + ")");
   return true;
 }
@@ -400,15 +424,17 @@ const subject = WEEKLY ? "Pause for Paws weekly summary, week ending " + today :
 console.log(subject);
 labels.forEach((k, i) => console.log(k + ": " + lines[i]));
 
+let report = { html: "", headline: "" };
+try { report = await buildReport(subject, labels.map((k, i) => [k, lines[i]])); } catch (e) { console.error("Charts skipped: " + e.message); }
+
 if (DRY) {
-  // Dry runs also print the daily numbers (counts only) so a one-page PDF can be built from them without sending an email.
-  const [i, m] = await Promise.allSettled([iosData(), mapsData()]);
-  console.log("REPORT_DATA " + JSON.stringify({ today, launch: LAUNCH_DATE, lines, ios: i.value || null, maps: m.value || null }));
+  // Dry runs also print the finished report page (counts only) so a one-page PDF can be made from it without sending an email.
+  console.log("REPORT_HTML " + Buffer.from(report.html).toString("base64"));
 }
 
 let delivered = false;
 try {
-  delivered = await sendEmail(subject, labels.map((k, i) => [k, lines[i]]));
+  delivered = await sendEmail(subject, labels.map((k, i) => [k, lines[i]]), report);
 } catch (e) {
   console.error("Email failed: " + String(e.message).slice(0, 200));
   process.exit(1);   // fail the run so GitHub emails you about it
