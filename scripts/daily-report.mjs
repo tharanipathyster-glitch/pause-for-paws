@@ -265,8 +265,9 @@ function barChart(title, series, color, unit) {
   const max = Math.max(1, ...series.map((d) => d.n));
   const total = series.reduce((a, d) => a + d.n, 0);
   const cols = series.map((d) => {
-    const h = d.n ? Math.max(3, Math.round((d.n / max) * 110)) : 1;
-    return '<td valign="bottom" title="' + shortDate(d.date) + ": " + fmt(d.n) + '" style="padding:0 1px;height:112px;vertical-align:bottom">' +
+    const h = d.n ? Math.max(3, Math.round((d.n / max) * 100)) : 1;
+    return '<td valign="bottom" title="' + shortDate(d.date) + ": " + fmt(d.n) + '" style="padding:0 1px;height:126px;vertical-align:bottom">' +
+      '<div style="text-align:center;font-size:9px;font-weight:bold;color:#17221e;height:13px;line-height:13px">' + (d.n || "") + "</div>" +
       '<div style="height:' + h + "px;background:" + (d.n ? color : "#d5ddd9") + ';border-radius:2px 2px 0 0;font-size:0;line-height:0">&nbsp;</div></td>';
   }).join("");
   return '<div style="margin:22px 0 4px;font-weight:bold;font-size:15px">' + escapeHtml(title) + "</div>" +
