@@ -1,10 +1,15 @@
-name: Daily email report
+name: Daily and weekly email report
 
 on:
   schedule:
     - cron: "0 1 * * *"   # 01:00 UTC every day = 7:00 PM Central Standard Time (8:00 PM while daylight time is on, until 1 Nov)
+    - cron: "0 14 * * 1"  # Mondays 14:00 UTC = 8:00 AM Central Standard Time: the weekly summary
   workflow_dispatch:
     inputs:
+      weekly:
+        description: "Send the weekly summary instead of the daily report"
+        type: boolean
+        default: false
       dry_run:
         description: "Build the report and print it, but do not send the email"
         type: boolean
@@ -34,5 +39,6 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
           ASC_VENDOR: ${{ secrets.ASC_VENDOR }}
+          REPORT_MODE: ${{ (github.event.schedule == '0 14 * * 1' || inputs.weekly) && 'weekly' || 'daily' }}
           WA_DRY: ${{ inputs.dry_run && '1' || '0' }}
         run: node scripts/daily-report.mjs

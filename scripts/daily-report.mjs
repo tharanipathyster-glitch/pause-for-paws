@@ -255,7 +255,7 @@ const fmt = (n) => Number(n).toLocaleString("en-US");
 const shortDate = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
 
 function tile(label, value, note) {
-  return '<td style="padding:12px 14px;background:#f1f6f3;border-radius:8px;width:25%;vertical-align:top">' +
+  return '<td style="padding:12px 14px;background:#f1f6f3;border-radius:8px;vertical-align:top">' +
     '<div style="font-size:11px;color:#5b6b64;text-transform:uppercase;letter-spacing:.04em">' + escapeHtml(label) + "</div>" +
     '<div style="font-size:26px;font-weight:bold;color:#17221e;margin:4px 0 2px">' + escapeHtml(value) + "</div>" +
     '<div style="font-size:11px;color:#5b6b64">' + escapeHtml(note) + "</div></td>";
@@ -273,10 +273,13 @@ function barChart(title, series, color, unit) {
   return '<div style="margin:22px 0 4px;font-weight:bold;font-size:15px">' + escapeHtml(title) + "</div>" +
     '<div style="font-size:12px;color:#5b6b64;margin-bottom:6px">' + fmt(total) + " " + unit + " in 30 days. Tallest day: " + fmt(max) + ".</div>" +
     '<table width="100%" style="border-collapse:collapse;table-layout:fixed;border-bottom:1px solid #9aa8a1"><tr>' + cols + "</tr></table>" +
-    '<table width="100%" style="border-collapse:collapse;table-layout:fixed;font-size:8px;color:#5b6b64;text-align:center"><tr>' +
+    '<table width="100%" style="border-collapse:collapse;table-layout:fixed;font-size:8.5px;font-weight:bold;color:#2f3b35;text-align:center"><tr>' +
     series.map((d) => '<td style="padding:2px 0">' + Number(d.date.slice(8)) + "</td>").join("") + "</tr></table>" +
     '<div style="font-size:11px;color:#5b6b64">Day of month, ' + shortDate(series[0].date) + " to " + shortDate(series[series.length - 1].date) + "</div>";
 }
+
+const WEEKLY = env.REPORT_MODE === "weekly";
+const vs = (cur, prev) => prev ? (cur >= prev ? "up " : "down ") + Math.abs(Math.round((cur - prev) / prev * 100)) + "% from " + fmt(prev) + " the week before" : "week before: " + fmt(prev);
 
 async function executiveHtml() {
   const [ios, maps] = await Promise.allSettled([iosData(), mapsData()]);
@@ -287,14 +290,24 @@ async function executiveHtml() {
     const days = ios.value, sum = (l) => l.reduce((a, d) => a + (d.n || 0), 0);
     const since = days.filter((d) => d.date >= LAUNCH_DATE);
     tiles.push(tile("Total users downloaded", fmt(sum(since)), "iOS, since launch (" + shortDate(LAUNCH_DATE) + ")"));
-    tiles.push(tile("Downloads, 7 days", fmt(sum(days.slice(0, 7))), "last 30 days: " + fmt(sum(days.slice(0, 30)))));
+    if (WEEKLY) {
+      const best = days.slice(0, 30).reduce((b, d) => ((d.n || 0) > (b.n || 0) ? d : b), days[0]);
+      tiles.push(tile("Downloads this week", fmt(sum(days.slice(0, 7))), vs(sum(days.slice(0, 7)), sum(days.slice(7, 14)))));
+      tiles.push(tile("Best day, last 30", fmt(best.n || 0), shortDate(best.date)));
+    } else {
+      tiles.push(tile("Downloads, 7 days", fmt(sum(days.slice(0, 7))), "last 30 days: " + fmt(sum(days.slice(0, 30)))));
+    }
     iosChart = barChart("iOS downloads per day, last 30 days", days.slice(0, 30).reverse().map((d) => ({ date: d.date, n: d.n || 0 })), "#2e7d5b", "downloads");
   }
   let mapsChart = "";
   if (maps.status === "fulfilled" && maps.value) {
     const m = maps.value;
+    if (WEEKLY) {
+      const wk = m.daily.slice(-7).reduce((a, d) => a + d.n, 0), prev = m.daily.slice(-14, -7).reduce((a, d) => a + d.n, 0);
+      tiles.push(tile("Google Maps this week", fmt(wk), vs(wk, prev)));
+    }
     tiles.push(tile("Google Maps, 30 days", fmt(m.month), m.kind + " (free tier is about 10,000 loads a month)"));
-    tiles.push(tile("Google Maps, 24 hours", fmt(m.day), m.kind + "; 7 days: " + fmt(m.week)));
+    if (!WEEKLY) tiles.push(tile("Google Maps, 24 hours", fmt(m.day), m.kind + "; 7 days: " + fmt(m.week)));
     mapsChart = barChart("Google Maps " + m.kind + " per day, last 30 days", m.daily, "#3b6fb6", m.kind);
   }
   if (tiles.length) html += '<table width="100%" style="border-collapse:separate;border-spacing:8px 0;margin:0 -8px"><tr>' + tiles.join("") + "</tr></table>";
@@ -328,7 +341,7 @@ async function sendEmail(subject, rows) {
 const lines = await Promise.all([freshness(), mapsLoads(), iosInstalls(), androidInstalls()]);
 const today = new Date().toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric" });
 const labels = ["Website data", "Google Maps", "iOS downloads", "Android installs"];
-const subject = "Pause for Paws daily report, " + today;
+const subject = WEEKLY ? "Pause for Paws weekly summary, week ending " + today : "Pause for Paws daily report, " + today;
 console.log(subject);
 labels.forEach((k, i) => console.log(k + ": " + lines[i]));
 
