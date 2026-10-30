@@ -61,9 +61,39 @@ async function monitoringSum(token, project, filter, hours) {
     (sum, ts) => sum + (ts.points || []).reduce((a, p) => a + Number(p.value.int64Value ?? p.value.doubleValue ?? 0), 0), 0);
 }
 
-async function mapsLoads() {
-  if (!env.GCP_SERVICE_ACCOUNT_JSON) return "not set up yet";
-  try {
+// One value per day for the last `days` days (day buckets end now, so labels are UTC dates).
+async function monitoringDaily(token, project, filter, days) {
+  const end = new Date();
+  const start = new Date(end.getTime() - days * 86400e3);
+  const q = new URLSearchParams({
+    filter,
+    "interval.startTime": start.toISOString(),
+    "interval.endTime": end.toISOString(),
+    "aggregation.alignmentPeriod": "86400s",
+    "aggregation.perSeriesAligner": "ALIGN_SUM",
+    "aggregation.crossSeriesReducer": "REDUCE_SUM",
+    view: "FULL",
+  });
+  const r = await fetch("https://monitoring.googleapis.com/v3/projects/" + project + "/timeSeries?" + q, { headers: { Authorization: "Bearer " + token } });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message);
+  const byDay = new Map();
+  for (const ts of j.timeSeries || []) for (const p of ts.points || []) {
+    const d = new Date(new Date(p.interval.endTime).getTime() - 43200e3).toISOString().slice(0, 10);
+    byDay.set(d, (byDay.get(d) || 0) + Number(p.value.int64Value ?? p.value.doubleValue ?? 0));
+  }
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(end.getTime() - i * 86400e3 - 43200e3).toISOString().slice(0, 10);
+    out.push({ date: d, n: byDay.get(d) || 0 });
+  }
+  return out;
+}
+
+let mapsPromise;
+function mapsData() {
+  return (mapsPromise ??= (async () => {
+    if (!env.GCP_SERVICE_ACCOUNT_JSON) return null;
     const sa = JSON.parse(env.GCP_SERVICE_ACCOUNT_JSON);
     const token = await googleToken(sa);
     const project = sa.project_id;
@@ -74,13 +104,22 @@ async function mapsLoads() {
     const requests = 'metric.type="serviceruntime.googleapis.com/api/request_count" AND ' + svc;
     let day = await monitoringSum(token, project, quota, 24);
     let week = await monitoringSum(token, project, quota, 168);
-    let kind = "map loads";
+    let kind = "map loads", filter = quota;
     if (!week) {
       day = await monitoringSum(token, project, requests, 24);
       week = await monitoringSum(token, project, requests, 168);
-      kind = "requests";
+      kind = "requests"; filter = requests;
     }
-    return day.toLocaleString("en-US") + " " + kind + " in the last 24 hours, " + week.toLocaleString("en-US") +
+    const daily = await monitoringDaily(token, project, filter, 30);
+    return { kind, day, week, daily, month: daily.reduce((a, d) => a + d.n, 0) };
+  })());
+}
+
+async function mapsLoads() {
+  try {
+    const m = await mapsData();
+    if (!m) return "not set up yet";
+    return m.day.toLocaleString("en-US") + " " + m.kind + " in the last 24 hours, " + m.week.toLocaleString("en-US") +
       " in 7 days (Google gives about 10,000 free map loads a month)";
   } catch (e) {
     return "could not read Google usage (" + String(e.message).slice(0, 80) + ")";
@@ -122,21 +161,33 @@ async function firstDownloadsOn(token, date) {
   return rows.filter((c) => c[iId] === APPLE_APP_ID && FIRST_DOWNLOAD_TYPES.has(c[iType])).reduce((a, c) => a + Number(c[iUnits] || 0), 0);
 }
 
-async function iosInstalls() {
-  if (!env.ASC_KEY_ID || !env.ASC_ISSUER_ID || !env.ASC_PRIVATE_KEY || !env.ASC_VENDOR) return "not set up yet";
-  try {
+const LAUNCH_DATE = env.APPLE_LAUNCH_DATE || "2026-10-13";               // approved and public; "total users" counts from here
+
+let iosPromise;
+function iosData() {
+  return (iosPromise ??= (async () => {
+    if (!env.ASC_KEY_ID || !env.ASC_ISSUER_ID || !env.ASC_PRIVATE_KEY || !env.ASC_VENDOR) return null;
     const token = ascToken();
-    const days = [];
-    for (let i = 1; i <= 30; i++) {
+    const days = [];   // newest first, from yesterday back to launch (at least 30 days so the chart is full)
+    const span = Math.min(365, Math.max(30, Math.ceil((Date.now() - Date.parse(LAUNCH_DATE)) / 86400e3)));
+    for (let i = 1; i <= span; i++) {
       const date = new Date(Date.now() - i * 86400e3).toISOString().slice(0, 10);
       days.push({ date, n: await firstDownloadsOn(token, date) });
       await sleep(150);
     }
+    return days;
+  })());
+}
+
+async function iosInstalls() {
+  try {
+    const days = await iosData();
+    if (!days) return "not set up yet";
     const have = days.filter((d) => d.n !== null);
     if (!have.length) return "no download reports from Apple yet (they can lag a day or two)";
     const sum = (list) => list.reduce((a, d) => a + (d.n || 0), 0);
     const latest = have[0];
-    return latest.n + " new download" + (latest.n === 1 ? "" : "s") + " on " + latest.date + " (last 7 days: " + sum(days.slice(0, 7)) + ", last 30 days: " + sum(days) + ")";
+    return latest.n + " new download" + (latest.n === 1 ? "" : "s") + " on " + latest.date + " (last 7 days: " + sum(days.slice(0, 7)) + ", last 30 days: " + sum(days.slice(0, 30)) + ", since launch: " + sum(days.filter((d) => d.date >= LAUNCH_DATE)) + ")";
   } catch (e) {
     return "could not read App Store downloads (" + String(e.message).slice(0, 80) + ")";
   }
@@ -198,19 +249,73 @@ async function loadNodemailer() {
   }
 }
 
+// ---- Executive summary for the email: headline numbers plus two 30-day bar charts (plain HTML, so every mail app shows them) ----
+
+const fmt = (n) => Number(n).toLocaleString("en-US");
+const shortDate = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
+
+function tile(label, value, note) {
+  return '<td style="padding:12px 14px;background:#f1f6f3;border-radius:8px;width:25%;vertical-align:top">' +
+    '<div style="font-size:11px;color:#5b6b64;text-transform:uppercase;letter-spacing:.04em">' + escapeHtml(label) + "</div>" +
+    '<div style="font-size:26px;font-weight:bold;color:#17221e;margin:4px 0 2px">' + escapeHtml(value) + "</div>" +
+    '<div style="font-size:11px;color:#5b6b64">' + escapeHtml(note) + "</div></td>";
+}
+
+function barChart(title, series, color, unit) {
+  const max = Math.max(1, ...series.map((d) => d.n));
+  const total = series.reduce((a, d) => a + d.n, 0);
+  const cols = series.map((d) => {
+    const h = d.n ? Math.max(3, Math.round((d.n / max) * 110)) : 1;
+    return '<td valign="bottom" title="' + shortDate(d.date) + ": " + fmt(d.n) + '" style="padding:0 1px;height:112px;vertical-align:bottom">' +
+      '<div style="height:' + h + "px;background:" + (d.n ? color : "#d5ddd9") + ';border-radius:2px 2px 0 0;font-size:0;line-height:0">&nbsp;</div></td>';
+  }).join("");
+  return '<div style="margin:22px 0 4px;font-weight:bold;font-size:15px">' + escapeHtml(title) + "</div>" +
+    '<div style="font-size:12px;color:#5b6b64;margin-bottom:6px">' + fmt(total) + " " + unit + " in 30 days. Tallest day: " + fmt(max) + ".</div>" +
+    '<table width="100%" style="border-collapse:collapse;table-layout:fixed;border-bottom:1px solid #9aa8a1"><tr>' + cols + "</tr></table>" +
+    '<table width="100%" style="border-collapse:collapse;font-size:11px;color:#5b6b64"><tr><td>' + shortDate(series[0].date) +
+    '</td><td align="right">' + shortDate(series[series.length - 1].date) + "</td></tr></table>";
+}
+
+async function executiveHtml() {
+  const [ios, maps] = await Promise.allSettled([iosData(), mapsData()]);
+  let html = "";
+  const tiles = [];
+  let iosChart = "";
+  if (ios.status === "fulfilled" && ios.value) {
+    const days = ios.value, sum = (l) => l.reduce((a, d) => a + (d.n || 0), 0);
+    const since = days.filter((d) => d.date >= LAUNCH_DATE);
+    tiles.push(tile("Total users downloaded", fmt(sum(since)), "iOS, since launch (" + shortDate(LAUNCH_DATE) + ")"));
+    tiles.push(tile("Downloads, 7 days", fmt(sum(days.slice(0, 7))), "last 30 days: " + fmt(sum(days.slice(0, 30)))));
+    iosChart = barChart("iOS downloads per day, last 30 days", days.slice(0, 30).reverse().map((d) => ({ date: d.date, n: d.n || 0 })), "#2e7d5b", "downloads");
+  }
+  let mapsChart = "";
+  if (maps.status === "fulfilled" && maps.value) {
+    const m = maps.value;
+    tiles.push(tile("Google Maps, 30 days", fmt(m.month), m.kind + " (free tier is about 10,000 loads a month)"));
+    tiles.push(tile("Google Maps, 24 hours", fmt(m.day), m.kind + "; 7 days: " + fmt(m.week)));
+    mapsChart = barChart("Google Maps " + m.kind + " per day, last 30 days", m.daily, "#3b6fb6", m.kind);
+  }
+  if (tiles.length) html += '<table width="100%" style="border-collapse:separate;border-spacing:8px 0;margin:0 -8px"><tr>' + tiles.join("") + "</tr></table>";
+  return html + iosChart + mapsChart;
+}
+
 async function sendEmail(subject, rows) {
   const user = env.GMAIL_USER;
   const pass = (env.GMAIL_APP_PASSWORD || "").replace(/\s+/g, "");
   if (!user || !pass) return false;
   const to = env.EMAIL_TO || user;
   const masked = to.replace(/^(.{2}).*(@.*)$/, "$1***$2");
-  if (DRY) { console.log("(email not sent: dry run; it would go to " + masked + ")"); return true; }
   const text = subject + "\n\n" + rows.map(([k, v]) => k + ": " + v).join("\n") + "\n";
-  const html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#17221e"><h2 style="margin:0 0 12px">' + escapeHtml(subject) + "</h2>" +
+  let summary = "";
+  try { summary = await executiveHtml(); } catch (e) { console.error("Charts skipped: " + e.message); }
+  const html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#17221e;max-width:640px"><h2 style="margin:0 0 14px">' + escapeHtml(subject) + "</h2>" +
+    summary + '<div style="margin:24px 0 6px;font-weight:bold;font-size:15px">Details</div>' +
     '<table style="border-collapse:collapse">' +
     rows.map(([k, v]) => '<tr><td style="padding:6px 14px 6px 0;vertical-align:top;font-weight:bold;white-space:nowrap">' + escapeHtml(k) +
       '</td><td style="padding:6px 0">' + escapeHtml(v) + "</td></tr>").join("") +
     '</table><p style="color:#6b7280;font-size:12px;margin-top:16px">Automatic daily report for the Pause for Paws app owner.</p></div>';
+  if (env.PREVIEW_FILE) { (await import("node:fs")).writeFileSync(env.PREVIEW_FILE, html); console.log("Preview written to " + env.PREVIEW_FILE); }
+  if (DRY) { console.log("(email not sent: dry run; it would go to " + masked + ")"); return true; }
   const nodemailer = await loadNodemailer();
   const transport = nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user, pass } });
   const info = await transport.sendMail({ from: '"Pause for Paws report" <' + user + ">", to, subject, text, html });
