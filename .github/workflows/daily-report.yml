@@ -1,9 +1,8 @@
 name: Daily WhatsApp report
 
 on:
-  # schedule is switched off until the daily_report template is approved by Meta:
-  # schedule:
-  #   - cron: "0 0 * * *"   # 7:00 PM US Central in daylight time (use "0 1 * * *" after 1 Nov)
+  schedule:
+    - cron: "0 1 * * *"   # 01:00 UTC every day = 7:00 PM Central Standard Time (8:00 PM while daylight time is on, until 1 Nov)
   workflow_dispatch:
     inputs:
       hello:

@@ -136,15 +136,17 @@ async function iosInstalls() {
     if (!have.length) return "no download reports from Apple yet (they can lag a day or two)";
     const sum = (list) => list.reduce((a, d) => a + (d.n || 0), 0);
     const latest = have[0];
-    return latest.n + " new downloads on " + latest.date + " (last 7 days: " + sum(days.slice(0, 7)) + ", last 30 days: " + sum(days) + ")";
+    return latest.n + " new download" + (latest.n === 1 ? "" : "s") + " on " + latest.date + " (last 7 days: " + sum(days.slice(0, 7)) + ", last 30 days: " + sum(days) + ")";
   } catch (e) {
     return "could not read App Store downloads (" + String(e.message).slice(0, 80) + ")";
   }
 }
 
 async function androidInstalls() {
-  if (!env.GCP_SERVICE_ACCOUNT_JSON || !env.PLAY_BUCKET) return "not set up yet";
-  return "not set up yet";   // to be filled in with the Play Console installs report
+  // Android is in closed testing, so there is no public install count to report yet.
+  // To add it later: read the Play Console installs report from its Cloud Storage bucket (env.PLAY_BUCKET) with the Google service account.
+  if (!env.GCP_SERVICE_ACCOUNT_JSON || !env.PLAY_BUCKET) return "not tracked yet (app is in closed testing)";
+  return "not tracked yet (app is in closed testing)";
 }
 
 function oneLine(s) {
