@@ -110,8 +110,26 @@ function mapsData() {
       week = await monitoringSum(token, project, requests, 168);
       kind = "requests"; filter = requests;
     }
-    const daily = await monitoringDaily(token, project, filter, 30);
-    return { kind, day, week, daily, month: daily.reduce((a, d) => a + d.n, 0) };
+    const all = await monitoringDaily(token, project, filter, 100);
+    const daily = all.slice(-30);
+    const sumOf = (list) => list.reduce((a, d) => a + d.n, 0);
+    // Calendar month to date and calendar quarter to date (UTC dates; Google resets free usage on the 1st).
+    const now = new Date(), y = now.getUTCFullYear(), mo = now.getUTCMonth();
+    const pad = (n) => String(n + 1).padStart(2, "0");
+    const monthKey = y + "-" + pad(mo), qStartMonth = mo - (mo % 3);
+    const mtd = sumOf(all.filter((d) => d.date.startsWith(monthKey)));
+    const dayOfMonth = now.getUTCDate(), daysInMonth = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+    const quarterMonths = [];
+    for (let k = qStartMonth; k <= mo; k++) {
+      const key = y + "-" + pad(k);
+      quarterMonths.push({ label: new Date(Date.UTC(y, k, 1)).toLocaleDateString("en-US", { timeZone: "UTC", month: "long" }), n: sumOf(all.filter((d) => d.date.startsWith(key))) });
+    }
+    return {
+      kind, day, week, daily, month: sumOf(daily),
+      monthName: new Date(Date.UTC(y, mo, 1)).toLocaleDateString("en-US", { timeZone: "UTC", month: "long" }),
+      mtd, projected: Math.round(mtd / dayOfMonth * daysInMonth), dayOfMonth, daysInMonth,
+      quarterLabel: "Q" + (Math.floor(mo / 3) + 1) + " " + y, quarterMonths, quarterTotal: sumOf(quarterMonths),
+    };
   })());
 }
 
@@ -120,7 +138,8 @@ async function mapsLoads() {
     const m = await mapsData();
     if (!m) return "not set up yet";
     return m.day.toLocaleString("en-US") + " " + m.kind + " in the last 24 hours, " + m.week.toLocaleString("en-US") +
-      " in 7 days (Google gives about 10,000 free map loads a month)";
+      " in 7 days; " + m.monthName + " so far " + m.mtd.toLocaleString("en-US") + ", on pace for " + m.projected.toLocaleString("en-US") +
+      " (Google gives about 10,000 free map loads a month)";
   } catch (e) {
     return "could not read Google usage (" + String(e.message).slice(0, 80) + ")";
   }
@@ -306,12 +325,20 @@ async function executiveHtml() {
       const wk = m.daily.slice(-7).reduce((a, d) => a + d.n, 0), prev = m.daily.slice(-14, -7).reduce((a, d) => a + d.n, 0);
       tiles.push(tile("Google Maps this week", fmt(wk), vs(wk, prev)));
     }
-    tiles.push(tile("Google Maps, 30 days", fmt(m.month), m.kind + " (free tier is about 10,000 loads a month)"));
+    tiles.push(tile("Google Maps, " + m.monthName + " so far", fmt(m.mtd), "of about 10,000 free a month; on pace for " + fmt(m.projected)));
     if (!WEEKLY) tiles.push(tile("Google Maps, 24 hours", fmt(m.day), m.kind + "; 7 days: " + fmt(m.week)));
     mapsChart = barChart("Google Maps " + m.kind + " per day, last 30 days", m.daily, "#3b6fb6", m.kind);
   }
   if (tiles.length) html += '<table width="100%" style="border-collapse:separate;border-spacing:8px 0;margin:0 -8px"><tr>' + tiles.join("") + "</tr></table>";
-  return html + iosChart + mapsChart;
+  let quarter = "";
+  if (maps.status === "fulfilled" && maps.value) {
+    const m = maps.value;
+    quarter = '<div style="margin:22px 0 6px;font-weight:bold;font-size:15px">Google Maps usage, ' + escapeHtml(m.quarterLabel) + " (quarter to date)</div>" +
+      '<table style="border-collapse:collapse;font-size:14px">' +
+      m.quarterMonths.map((q) => '<tr><td style="padding:3px 24px 3px 0">' + escapeHtml(q.label) + '</td><td align="right" style="padding:3px 0">' + fmt(q.n) + " " + m.kind + "</td></tr>").join("") +
+      '<tr><td style="padding:6px 24px 3px 0;border-top:1px solid #9aa8a1;font-weight:bold">Quarter total</td><td align="right" style="padding:6px 0 3px;border-top:1px solid #9aa8a1;font-weight:bold">' + fmt(m.quarterTotal) + " " + m.kind + "</td></tr></table>";
+  }
+  return html + iosChart + mapsChart + quarter;
 }
 
 async function sendEmail(subject, rows) {
