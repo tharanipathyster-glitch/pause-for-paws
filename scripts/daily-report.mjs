@@ -340,7 +340,7 @@ async function executiveHtml() {
     // Show the month before launch as 0 so the chart has an earlier month to compare with.
     if (past.length && past[0].date.slice(0, 7) === LAUNCH_DATE.slice(0, 7)) {
       const pm = new Date(Date.UTC(+LAUNCH_DATE.slice(0, 4), +LAUNCH_DATE.slice(5, 7) - 2, 1));
-      past.unshift({ date: pm.toISOString().slice(0, 10), n: 0, label: pm.toLocaleDateString("en-US", { timeZone: "UTC", month: "short" }) });
+      past.unshift({ date: pm.toISOString().slice(0, 10), n: 0, label: "Pre-launch" });
     }
     iosChart = monthDays.length ? barChart("iOS downloads per day, " + monthName + " so far", monthDays, "#2e7d5b", "downloads", { span: "so far this month", note: "Day of month. Apple reports lag about two days, so the last two bars may still rise." }) : "";
     iosChart += past.length ? barChart("iOS downloads by month, since launch", past, "#7fb59a", "downloads", { label: (d) => d.label, span: "since launch", events: false, showZero: true, note: "Earlier months will fill in here as each month ends; the app went live " + shortDate(LAUNCH_DATE) + "." }) : "";
