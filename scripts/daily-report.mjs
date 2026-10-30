@@ -288,7 +288,7 @@ function tile(label, value, note) {
 }
 
 // Moments worth marking on the charts (shown as a flag under that day's bar).
-const EVENTS = [{ date: "2026-10-21", label: "WHO 13 featured the app" }];
+const EVENTS = [{ date: "2026-10-21", label: "WHO 13 featured the app", url: "https://who13.com/news/metro-news/waukee-middle-school-students-develop-app-to-warn-drivers-of-animal-crash-hotspots/" }];
 
 function barChart(title, series, color, unit, opts = {}) {
   const max = Math.max(1, ...series.map((d) => d.n));
@@ -308,7 +308,7 @@ function barChart(title, series, color, unit, opts = {}) {
     '<table width="100%" style="border-collapse:collapse;table-layout:fixed;border-bottom:1px solid #9aa8a1"><tr>' + cols + "</tr></table>" +
     '<table width="100%" style="border-collapse:collapse;table-layout:fixed;font-size:8.5px;font-weight:bold;color:#2f3b35;text-align:center"><tr>' +
     series.map((d) => '<td style="padding:2px 0">' + labelOf(d) + "</td>").join("") + "</tr></table>" + flags +
-    (marks.length ? '<div style="font-size:11px;color:#b3261e">&#9650; ' + marks.map((e) => shortDate(e.date) + ": " + escapeHtml(e.label)).join("; ") + "</div>" : "") +
+    (marks.length ? '<div style="font-size:11px;color:#b3261e">&#9650; ' + marks.map((e) => shortDate(e.date) + ": " + (e.url ? '<a href="' + e.url + '" style="color:#b3261e">' + escapeHtml(e.label) + "</a>" : escapeHtml(e.label))).join("; ") + "</div>" : "") +
     (opts.note ? '<div style="font-size:11px;color:#5b6b64">' + opts.note + "</div>" : "");
 }
 
