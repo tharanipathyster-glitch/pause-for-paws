@@ -273,8 +273,9 @@ function barChart(title, series, color, unit) {
   return '<div style="margin:22px 0 4px;font-weight:bold;font-size:15px">' + escapeHtml(title) + "</div>" +
     '<div style="font-size:12px;color:#5b6b64;margin-bottom:6px">' + fmt(total) + " " + unit + " in 30 days. Tallest day: " + fmt(max) + ".</div>" +
     '<table width="100%" style="border-collapse:collapse;table-layout:fixed;border-bottom:1px solid #9aa8a1"><tr>' + cols + "</tr></table>" +
-    '<table width="100%" style="border-collapse:collapse;font-size:11px;color:#5b6b64"><tr><td>' + shortDate(series[0].date) +
-    '</td><td align="right">' + shortDate(series[series.length - 1].date) + "</td></tr></table>";
+    '<table width="100%" style="border-collapse:collapse;table-layout:fixed;font-size:8px;color:#5b6b64;text-align:center"><tr>' +
+    series.map((d) => '<td style="padding:2px 0">' + Number(d.date.slice(8)) + "</td>").join("") + "</tr></table>" +
+    '<div style="font-size:11px;color:#5b6b64">Day of month, ' + shortDate(series[0].date) + " to " + shortDate(series[series.length - 1].date) + "</div>";
 }
 
 async function executiveHtml() {
