@@ -426,14 +426,16 @@ async function sendEmail(subject, rows, report) {
   const user = env.GMAIL_USER;
   const pass = (env.GMAIL_APP_PASSWORD || "").replace(/\s+/g, "");
   if (!user || !pass) return false;
-  const to = env.EMAIL_TO || user;
-  const masked = to.replace(/^(.{2}).*(@.*)$/, "$1***$2");
+  // EMAIL_TO can hold several addresses separated by commas: the first is the main recipient, the others get a blind copy so nobody sees each other's address.
+  const all = (env.EMAIL_TO || user).split(",").map((a) => a.trim()).filter(Boolean);
+  const to = all[0], bcc = all.slice(1);
+  const masked = all.map((a) => a.replace(/^(.{2}).*(@.*)$/, "$1***$2")).join(", ");
   const text = subject + "\n\n" + (report.headline ? report.headline + "\n\n" : "") + rows.map(([k, v]) => k + ": " + v).join("\n") + "\n";
   if (env.PREVIEW_FILE) { (await import("node:fs")).writeFileSync(env.PREVIEW_FILE, report.html); console.log("Preview written to " + env.PREVIEW_FILE); }
   if (DRY) { console.log("(email not sent: dry run; it would go to " + masked + ")"); return true; }
   const nodemailer = await loadNodemailer();
   const transport = nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user, pass } });
-  const info = await transport.sendMail({ from: '"Pause for Paws report" <' + user + ">", to, subject, text, html: report.html,
+  const info = await transport.sendMail({ from: '"Pause for Paws report" <' + user + ">", to, bcc, subject, text, html: report.html,
     attachments: existsSync(LOGO_PATH) ? [{ filename: "pause-for-paws.png", path: LOGO_PATH, cid: "applogo" }] : [] });
   console.log("Email sent to " + masked + " (" + info.messageId + ")");
   return true;
