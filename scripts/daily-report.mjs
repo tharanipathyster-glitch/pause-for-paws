@@ -298,7 +298,7 @@ function barChart(title, series, color, unit, opts = {}) {
   const cols = series.map((d) => {
     const h = d.n ? Math.max(3, Math.round((d.n / max) * 100)) : 1;
     return '<td valign="bottom" title="' + shortDate(d.date) + ": " + fmt(d.n) + '" style="padding:0 1px;height:126px;vertical-align:bottom">' +
-      '<div style="text-align:center;font-size:9px;font-weight:bold;color:#17221e;height:13px;line-height:13px">' + (d.n || "") + "</div>" +
+      '<div style="text-align:center;font-size:9px;font-weight:bold;color:#17221e;height:13px;line-height:13px">' + (d.n || opts.showZero ? d.n : "") + "</div>" +
       '<div style="height:' + h + "px;background:" + (d.n ? color : "#d5ddd9") + ';border-radius:2px 2px 0 0;font-size:0;line-height:0">&nbsp;</div></td>';
   }).join("");
   const flags = marks.length ? '<table width="100%" style="border-collapse:collapse;table-layout:fixed;font-size:9px;text-align:center;color:#b3261e;font-weight:bold"><tr>' +
@@ -337,8 +337,13 @@ async function executiveHtml() {
     const byMonth = new Map();
     for (const d of days) if (d.date >= LAUNCH_DATE) byMonth.set(d.date.slice(0, 7), (byMonth.get(d.date.slice(0, 7)) || 0) + (d.n || 0));
     const past = [...byMonth].reverse().map(([k, n]) => ({ date: k + "-01", n, label: new Date(k + "-01T12:00:00Z").toLocaleDateString("en-US", { timeZone: "UTC", month: "short" }) + (k === monthKey ? " (so far)" : "") }));
+    // Show the month before launch as 0 so the chart has an earlier month to compare with.
+    if (past.length && past[0].date.slice(0, 7) === LAUNCH_DATE.slice(0, 7)) {
+      const pm = new Date(Date.UTC(+LAUNCH_DATE.slice(0, 4), +LAUNCH_DATE.slice(5, 7) - 2, 1));
+      past.unshift({ date: pm.toISOString().slice(0, 10), n: 0, label: pm.toLocaleDateString("en-US", { timeZone: "UTC", month: "short" }) });
+    }
     iosChart = monthDays.length ? barChart("iOS downloads per day, " + monthName + " so far", monthDays, "#2e7d5b", "downloads", { span: "so far this month", note: "Day of month. Apple reports lag about two days, so the last two bars may still rise." }) : "";
-    iosChart += past.length ? barChart("iOS downloads by month, since launch", past, "#7fb59a", "downloads", { label: (d) => d.label, span: "since launch", events: false, note: "Earlier months will fill in here as each month ends; the app went live " + shortDate(LAUNCH_DATE) + "." }) : "";
+    iosChart += past.length ? barChart("iOS downloads by month, since launch", past, "#7fb59a", "downloads", { label: (d) => d.label, span: "since launch", events: false, showZero: true, note: "Earlier months will fill in here as each month ends; the app went live " + shortDate(LAUNCH_DATE) + "." }) : "";
   }
   let mapsChart = "";
   if (maps.status === "fulfilled" && maps.value) {
