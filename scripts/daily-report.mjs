@@ -100,34 +100,6 @@ async function monitoringDaily(token, project, filter, days) {
   return out;
 }
 
-// Dry-run diagnostic: does the same Maps usage question get the same answer from different queries? (counts only)
-async function mapsBreakdown() {
-  const sa = JSON.parse(env.GCP_SERVICE_ACCOUNT_JSON);
-  const token = await googleToken(sa);
-  const filter = 'metric.type="serviceruntime.googleapis.com/api/request_count" AND resource.labels.service="maps-backend.googleapis.com"';
-  const total = async (days, period, reducer) => {
-    const end = new Date(), start = new Date(end.getTime() - days * 86400e3);
-    const q = new URLSearchParams({ filter, "interval.startTime": start.toISOString(), "interval.endTime": end.toISOString(),
-      "aggregation.alignmentPeriod": period + "s", "aggregation.perSeriesAligner": "ALIGN_SUM", view: "FULL" });
-    if (reducer) q.set("aggregation.crossSeriesReducer", "REDUCE_SUM");
-    let sum = 0, series = 0, points = 0, tok = "";
-    do {
-      if (tok) q.set("pageToken", tok);
-      const j = await (await fetch("https://monitoring.googleapis.com/v3/projects/" + sa.project_id + "/timeSeries?" + q, { headers: { Authorization: "Bearer " + token } })).json();
-      if (j.error) return "error " + j.error.message;
-      for (const ts of j.timeSeries || []) { series++; for (const x of ts.points || []) { points++; sum += Number(x.value.int64Value ?? x.value.doubleValue ?? 0); } }
-      tok = j.nextPageToken || "";
-    } while (tok);
-    return sum + " (" + series + " series, " + points + " points)";
-  };
-  const out = [];
-  for (const [label, days, period, reducer] of [["7d one bucket reduced", 7, 7 * 86400, true], ["7d daily reduced", 7, 86400, true], ["7d daily per series", 7, 86400, false],
-    ["30d daily reduced", 30, 86400, true], ["30d daily per series", 30, 86400, false], ["30d hourly per series", 30, 3600, false], ["30d one bucket reduced", 30, 30 * 86400, true]]) {
-    out.push(label + " = " + await total(days, period, reducer));
-  }
-  return out.join(" ;; ");
-}
-
 let mapsPromise;
 function mapsData() {
   return (mapsPromise ??= (async () => {
@@ -148,13 +120,14 @@ function mapsData() {
       week = await monitoringSum(token, project, requests, 168);
       kind = "requests"; filter = requests;
     }
-    // Google's daily series has come back incomplete now and then. The last 7 days must match the separate 7-day total; otherwise ask again.
+    // Google's daily series has come back incomplete now and then. The last 7 and 30 days must match the separate totals; otherwise ask again.
     let all;
     for (let attempt = 1; attempt <= 4; attempt++) {
       all = await monitoringDaily(token, project, filter, 190);
       const last7 = all.slice(-7).reduce((a, d) => a + d.n, 0);
-      if (Math.abs(last7 - week) <= Math.max(10, week * 0.1)) break;
-      if (attempt === 4) throw new Error("Google daily usage did not match its 7-day total");
+      const last30 = all.slice(-30).reduce((a, d) => a + d.n, 0), month30 = await monitoringSum(token, project, filter, 720);
+      if (Math.abs(last7 - week) <= Math.max(10, week * 0.1) && Math.abs(last30 - month30) <= Math.max(20, month30 * 0.1)) break;
+      if (attempt === 4) throw new Error("Google daily usage did not match its 7-day and 30-day totals");
       await sleep(3000);
     }
     const daily = all.slice(-30);
@@ -438,7 +411,7 @@ async function buildReport(subject, rows) {
     '<table width="100%" style="border-collapse:collapse"><tr><td bgcolor="#17382b" style="background:#17382b;border-radius:12px;padding:14px 18px">' +
     '<table style="border-collapse:collapse"><tr>' + (existsSync(LOGO_PATH) ? '<td style="padding:0 14px 0 0;vertical-align:middle"><img src="cid:applogo" width="52" height="52" alt="Pause for Paws" style="display:block;border-radius:12px;border:0"></td>' : "") +
     '<td style="vertical-align:middle"><div style="font-size:21px;font-weight:bold;color:#ffffff">Pause for Paws</div>' +
-    '<div style="font-size:12.5px;color:#bfd8cb;margin-top:2px">' + escapeHtml(subject.replace(/^Pause for Paws /, "")) + "</div>" +
+    '<div style="font-size:12.5px;color:#bfd8cb;margin-top:2px">' + escapeHtml(subject.replace(/^Pause for Paws /, "").replace(/^./, (ch) => ch.toUpperCase())) + "</div>" +
     '<div style="font-size:11.5px;color:#8fb8a3;margin-top:2px">Built by The Blizzards, a Waukee middle school student team</div></td></tr></table></td></tr></table>' +
     (headline ? '<div style="font-size:15.5px;font-weight:bold;line-height:1.4;margin:14px 0 0">' + escapeHtml(headline) + "</div>" : "") +
     tilesHtml + iosCharts + mapsCharts + quarter +
@@ -478,7 +451,6 @@ try { report = await buildReport(subject, labels.map((k, i) => [k, lines[i]])); 
 
 if (DRY) {
   // Dry runs also print the finished report page (counts only) so a one-page PDF can be made from it without sending an email.
-  try { console.log("MAPS_BREAKDOWN " + await mapsBreakdown()); } catch (e) { console.log("breakdown failed " + e.message); }
   console.log("REPORT_HTML " + Buffer.from(report.html).toString("base64"));
 }
 
