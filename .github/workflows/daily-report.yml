@@ -2,8 +2,14 @@ name: Daily and weekly email report
 
 on:
   schedule:
-    - cron: "3 1 * * *"   # 01:03 UTC every day = 7:03 PM Central Standard Time (8:03 PM while daylight time is on, until 1 Nov). Off the top of the hour because GitHub skips minute-0 runs under load.
-    - cron: "7 14 * * 1"  # Mondays 14:07 UTC = 8:07 AM Central Standard Time: the weekly summary
+    # Daily: 7:03 PM Central. The clock moves, so cron fires at 00:03, 01:03 and 02:03 UTC and the
+    # "Decide" step lets only the first one at or after 7 PM Central send (the others are backups).
+    - cron: "3 0 * * *"
+    - cron: "3 1 * * *"
+    - cron: "3 2 * * *"
+    # Mondays: weekly summary at about 8 AM Central, with a backup an hour later.
+    - cron: "7 14 * * 1"
+    - cron: "7 15 * * 1"
   workflow_dispatch:
     inputs:
       weekly:
@@ -17,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   report:
@@ -28,7 +35,34 @@ jobs:
           node-version: "22"
       - name: Install the mail library (kept out of the project's own dependencies)
         run: npm install --prefix .mail-deps nodemailer@6
+      - name: Decide whether this run should send
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          CRON: ${{ github.event.schedule }}
+        run: |
+          send=true
+          if [ "$EVENT" = "schedule" ]; then
+            hour=$(TZ=America/Chicago date +%-H)
+            case "$CRON" in
+              "7 14 * * 1"|"7 15 * * 1") ok=true ;;
+              *) if [ "$hour" -ge 19 ] && [ "$hour" -le 22 ]; then ok=true; else ok=false; fi ;;
+            esac
+            if [ "$ok" != "true" ]; then
+              send=false; echo "Not yet 7 PM Central (hour $hour): skipping."
+            else
+              since=$(date -u -d '5 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+              for id in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow daily-report.yml --event schedule --created ">=$since" --json databaseId --jq '.[].databaseId'); do
+                [ "$id" = "$GITHUB_RUN_ID" ] && continue
+                done_=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" --jq '[.jobs[].steps[] | select(.name=="Build and send the report" and .conclusion=="success")] | length')
+                if [ "$done_" != "0" ]; then send=false; echo "Run $id already sent this report: skipping."; fi
+              done
+            fi
+          fi
+          echo "send=$send" >> "$GITHUB_OUTPUT"
       - name: Build and send the report
+        if: steps.gate.outputs.send == 'true'
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
@@ -39,6 +73,6 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
           ASC_VENDOR: ${{ secrets.ASC_VENDOR }}
-          REPORT_MODE: ${{ (github.event.schedule == '7 14 * * 1' || inputs.weekly) && 'weekly' || 'daily' }}
+          REPORT_MODE: ${{ (github.event.schedule == '7 14 * * 1' || github.event.schedule == '7 15 * * 1' || inputs.weekly) && 'weekly' || 'daily' }}
           WA_DRY: ${{ inputs.dry_run && '1' || '0' }}
         run: node scripts/daily-report.mjs
