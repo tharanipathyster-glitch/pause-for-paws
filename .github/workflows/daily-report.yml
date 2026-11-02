@@ -1,5 +1,8 @@
 name: Daily and weekly email report
 
+# Each run is titled with its mode so the once-a-day check below can compare like with like.
+run-name: Report (${{ (github.event.schedule == '7 14 * * 1' || github.event.schedule == '7 15 * * 1' || inputs.weekly) && 'weekly' || 'daily' }}${{ inputs.dry_run && ', dry run' || '' }})
+
 on:
   schedule:
     # Daily: 7:03 PM Central. The clock moves, so cron fires at 00:03, 01:03 and 02:03 UTC and the
@@ -47,17 +50,19 @@ jobs:
           if [ "$EVENT" = "schedule" ]; then
             hour=$(TZ=America/Chicago date +%-H)
             case "$CRON" in
-              "7 14 * * 1"|"7 15 * * 1") ok=true ;;
-              *) if [ "$hour" -ge 19 ] || [ "$hour" -le 6 ]; then ok=true; else ok=false; fi ;;
+              "7 14 * * 1"|"7 15 * * 1") mode=weekly; ok=true; lookback="3 hours ago" ;;
+              *) mode=daily; lookback="14 hours ago"
+                 if [ "$hour" -ge 19 ] || [ "$hour" -le 6 ]; then ok=true; else ok=false; fi ;;
             esac
             if [ "$ok" != "true" ]; then
               send=false; echo "Not 7 PM to 7 AM Central (hour $hour): skipping."
             else
-              since=$(date -u -d '14 hours ago' +%Y-%m-%dT%H:%M:%SZ)
-              for id in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow daily-report.yml --event schedule --created ">=$since" --json databaseId --jq '.[].databaseId'); do
+              since=$(date -u -d "$lookback" +%Y-%m-%dT%H:%M:%SZ)
+              # Earlier runs of the same mode (scheduled or manual, not dry runs) that already sent.
+              for id in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow daily-report.yml --created ">=$since" --limit 100 --json databaseId,displayTitle --jq ".[] | select(.displayTitle | contains(\"($mode)\")) | .databaseId"); do
                 [ "$id" = "$GITHUB_RUN_ID" ] && continue
                 done_=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" --jq '[.jobs[].steps[] | select(.name=="Build and send the report" and .conclusion=="success")] | length')
-                if [ "$done_" != "0" ]; then send=false; echo "Run $id already sent this report: skipping."; fi
+                if [ "$done_" != "0" ]; then send=false; echo "Run $id already sent this $mode report: skipping."; fi
               done
             fi
           fi
