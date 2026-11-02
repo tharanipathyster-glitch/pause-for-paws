@@ -3,7 +3,8 @@ name: Daily and weekly email report
 on:
   schedule:
     # Daily: 7:03 PM Central. The clock moves, so cron fires at 00:03, 01:03 and 02:03 UTC and the
-    # "Decide" step lets only the first one at or after 7 PM Central send (the others are backups).
+    # "Decide" step lets only the first one that arrives between 7 PM and 7 AM Central send (the others are backups).
+    # GitHub sometimes delivers scheduled runs hours late, so late arrivals still send.
     - cron: "3 0 * * *"
     - cron: "3 1 * * *"
     - cron: "3 2 * * *"
@@ -47,12 +48,12 @@ jobs:
             hour=$(TZ=America/Chicago date +%-H)
             case "$CRON" in
               "7 14 * * 1"|"7 15 * * 1") ok=true ;;
-              *) if [ "$hour" -ge 19 ] && [ "$hour" -le 22 ]; then ok=true; else ok=false; fi ;;
+              *) if [ "$hour" -ge 19 ] || [ "$hour" -le 6 ]; then ok=true; else ok=false; fi ;;
             esac
             if [ "$ok" != "true" ]; then
-              send=false; echo "Not yet 7 PM Central (hour $hour): skipping."
+              send=false; echo "Not 7 PM to 7 AM Central (hour $hour): skipping."
             else
-              since=$(date -u -d '5 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+              since=$(date -u -d '14 hours ago' +%Y-%m-%dT%H:%M:%SZ)
               for id in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow daily-report.yml --event schedule --created ">=$since" --json databaseId --jq '.[].databaseId'); do
                 [ "$id" = "$GITHUB_RUN_ID" ] && continue
                 done_=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" --jq '[.jobs[].steps[] | select(.name=="Build and send the report" and .conclusion=="success")] | length')
