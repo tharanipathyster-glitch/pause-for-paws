@@ -75,8 +75,12 @@ function lastDataMonth() {
 function renderDataStamp() {
   const el = $("#updatedStamp");
   if (!el || !DATA) return;
+  // Iowa DOT publishes a few days behind, so also say when this page last pulled the data.
+  const refreshed = ALL && ALL.generated
+    ? ` · refreshed ${new Date(ALL.generated + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+    : "";
   el.textContent = DATA.partial
-    ? (DATA.through ? `Data through ${formatIsoDate(DATA.through)}` : `${DATA.year} so far`)
+    ? (DATA.through ? `Data through ${formatIsoDate(DATA.through)}${refreshed}` : `${DATA.year} so far`)
     : `Full year ${DATA.year}`;
 }
 
@@ -260,10 +264,12 @@ function renderDayChart() {
     const bars = series.map((s) => {
       const n = s.data[i] || 0;
       const noData = i >= cutoff(s) || i >= s.data.length;
-      const cls = (s.primary ? " primary" : " secondary") + (s.primary && n === primaryPeak && primaryPeak > 0 && !noData ? " peak" : "") + (noData ? " none" : "");
+      const latestDay = s.primary && !noData && i === primaryCut - 1; // newest day: the DOT is still adding records
+      const cls = (s.primary ? " primary" : " secondary") + (s.primary && n === primaryPeak && primaryPeak > 0 && !noData ? " peak" : "") + (noData ? " none" : "") + (latestDay ? " partial" : "");
       return `<div class="day-bar${cls}" style="height:${noData ? 0 : Math.max(Math.round((n / peakAll) * 100), 2)}%"></div>`;
     });
-    const tip = series.map((s) => `${s.year}: ${i >= cutoff(s) ? "no data yet" : s.data[i] || 0}`).join(" / ");
+    const tip = series.map((s) => `${s.year}: ${i >= cutoff(s) ? "no data yet" : s.data[i] || 0}`).join(" / ") +
+      (i === primaryCut - 1 ? " (latest day, still filling in)" : "");
     const future = i >= primaryCut;
     return `<div class="day-col${future ? " future" : ""}" title="${MONTHS[selectedMonth]} ${i + 1}. ${tip}">
       <span class="day-value">${future ? "" : (primary.data[i] || 0)}</span>
@@ -279,7 +285,7 @@ function renderDayChart() {
     const worstDay = primaryDays.indexOf(primaryPeak) + 1;
     const quietDays = primaryDays.filter((n) => n === 0).length;
     note = (primaryCut < primary.data.length
-      ? `${MONTHS[selectedMonth]} ${DATA.year} has had ${primaryTotal.toLocaleString()} animal-related crashes so far (data through ${formatIsoDate(DATA.through)}). `
+      ? `${MONTHS[selectedMonth]} ${DATA.year} has had ${primaryTotal.toLocaleString()} animal-related crashes so far (data through ${formatIsoDate(DATA.through)}; the latest day is still filling in). `
       : `${MONTHS[selectedMonth]} ${DATA.year} had ${primaryTotal.toLocaleString()} animal-related crashes, ${Math.round((primaryTotal / DATA.totalCrashes) * 100)}% of ${periodLabel()}. `) +
       `The worst day was ${MONTHS[selectedMonth]} ${worstDay} with ${primaryPeak}. ` +
       (quietDays ? `${quietDays} day${quietDays === 1 ? "" : "s"} had none. ` : `Every day had at least one. `);
