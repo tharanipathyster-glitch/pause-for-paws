@@ -20,6 +20,13 @@ SERVICE = "https://gis.iowadot.gov/agshost/rest/services/Traffic_Safety/Crash_Da
 PAGE = 2000  # the service's maxRecordCount
 THIS_YEAR = datetime.date.today().year
 YEARS = [THIS_YEAR, THIS_YEAR - 1]
+# The refresh runs on a UTC server, so late-evening runs would otherwise be stamped with tomorrow's date.
+# The site and the daily report show this date, so use the team's own time zone (Central).
+try:
+    from zoneinfo import ZoneInfo
+    TODAY_CENTRAL = datetime.datetime.now(ZoneInfo("America/Chicago")).date()
+except Exception:  # no time zone database: fall back to the server's date
+    TODAY_CENTRAL = datetime.date.today()
 OFFLINE = "--offline" in sys.argv
 
 # CSEV codes in the service
@@ -353,7 +360,7 @@ if str(prev_year) in years:
     compare_years(prev["desMoines"]["corridors"], default_year, cur_index, None)
 
 payload = {
-    "generated": datetime.date.today().isoformat(),
+    "generated": TODAY_CENTRAL.isoformat(),
     "source": "Iowa DOT Crash Data feature service (Traffic_Safety/Crash_Data), crashes whose major cause is Animal",
     "defaultYear": default_year,
     "years": years,
